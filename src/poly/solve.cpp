@@ -1,0 +1,71 @@
+// poly/solve.cpp — exact real-root solving over the Sturm machinery.
+#include "keel/core.h"
+#include "keel/algo.h"
+#include "keel/cas/poly/solve.hpp"
+
+#include "keel/cas/poly/zassenhaus.hpp"
+
+
+namespace keel::cas {
+
+keel::Array<RealRootSolution> solveRealRoots(const UPoly &p)
+{
+    KEEL_ASSERT(!p.isZero() && "solveRealRoots of the zero polynomial");
+    keel::Array<RealRootSolution> out;
+    if (p.deg() < 1)
+        return out; // non-zero constant: no roots
+
+    UPoly sq = p.squarefreePart();
+    sq.makeMonic();
+    const keel::Array<RootInterval> ivs = isolateRealRoots(sq); // ascending
+
+    // Exact rational roots through the full factorization: a root r
+    // of the linear factors of the squarefree part. The interval
+    // bracket identifies which isolated root it is.
+    keel::Array<Rational> rationals;
+    for (const UPoly &f : factorOverQ(sq))
+        if (f.deg() == 1)
+            rationals.push_back(f.coeff(0) * Rational(keel::i64{-1}));
+    keel::sort(rationals.begin(), rationals.end());
+
+    out.reserve(ivs.size());
+    keel::usize nextRational = 0;
+    for (keel::usize k = 0; k < ivs.size(); ++k) {
+        RealRootSolution s;
+        s.carrier = sq;
+        s.realIndex = keel::as<keel::i32>(k);
+        s.interval = ivs[k];
+        // Matching rules against boundary ambiguity: a rational root
+        // sitting ON a bracket boundary belongs to ITS OWN exact
+        // interval (r, r], never to the neighbour whose hi (or lo)
+        // merely touches it. Exact brackets match by value; a
+        // non-exact bracket only matches a rational STRICTLY inside,
+        // and then the bracket sharpens to the exact point.
+        bool matched = false;
+        if (nextRational < rationals.size()) {
+            const Rational &r = rationals[nextRational];
+            if (ivs[k].exact()) {
+                matched = r == ivs[k].hi;
+            } else if (r > ivs[k].lo && r < ivs[k].hi) {
+                matched = true;
+                s.interval = RootInterval{r, r}; // sharpen
+            }
+        }
+        if (matched) {
+            s.isRational = true;
+            s.value = rationals[nextRational];
+            KEEL_ASSERT(sq.eval(s.value).isZero() &&
+                   "matched rational is not a root");
+            ++nextRational;
+        } else {
+            KEEL_ASSERT(!ivs[k].exact() &&
+                   "exact interval without a rational root: inconsistent");
+        }
+        out.push_back(keel::move(s));
+    }
+    KEEL_ASSERT(nextRational == rationals.size() &&
+           "unmatched rational root: isolation inconsistent");
+    return out;
+}
+
+} // namespace keel::cas

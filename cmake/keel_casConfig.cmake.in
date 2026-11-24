@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(keel)
+find_dependency(keel_bignum)
+
+include("${CMAKE_CURRENT_LIST_DIR}/keel_casTargets.cmake")
+
+if(TARGET keel::keel_cas AND NOT TARGET keel::cas)
+    add_library(keel::cas ALIAS keel::keel_cas)
+endif()
+
+check_required_components(keel_cas)
