@@ -36,7 +36,7 @@ keel::u64 fpNext(keel::u64 &state)
 
 void FpPoly::checkSameField(const FpPoly &a, const FpPoly &b)
 {
-    KEEL_ASSERT((!a.hasP() || !b.hasP() || a.p_ == b.p_) && "FpPoly field mismatch");
+    KEEL_CAS_ASSERT((!a.hasP() || !b.hasP() || a.p_ == b.p_) && "FpPoly field mismatch");
 }
 
 FpPoly FpPoly::derivative() const
@@ -54,7 +54,7 @@ FpPoly FpPoly::derivative() const
 FpPoly::FpPoly(keel::u64 p, keel::Array<keel::u64> coeffs)
     : p_(p), c_(keel::move(coeffs))
 {
-    KEEL_ASSERT(p >= 3 && p < (keel::u64{1} << 31));
+    KEEL_CAS_ASSERT(p >= 3 && p < (keel::u64{1} << 31));
     for (keel::u64 &c : c_)
         c %= p;
     trim();
@@ -85,7 +85,7 @@ FpPoly FpPoly::x(keel::u64 p)
 
 keel::u64 FpPoly::lc() const
 {
-    KEEL_ASSERT(!isZero());
+    KEEL_CAS_ASSERT(!isZero());
     return c_.back();
 }
 
@@ -157,7 +157,7 @@ FpPoly FpPoly::operator*(keel::u64 k) const
 
 keel::u64 FpPoly::invModP(keel::u64 a, keel::u64 p)
 {
-    KEEL_ASSERT(a % p != 0);
+    KEEL_CAS_ASSERT(a % p != 0);
     keel::i64 t = 0, newt = 1;
     keel::i64 r = keel::as<keel::i64>(p), newr = keel::as<keel::i64>(a % p);
     while (newr != 0) {
@@ -169,7 +169,7 @@ keel::u64 FpPoly::invModP(keel::u64 a, keel::u64 p)
         r = newr;
         newr = tmp;
     }
-    KEEL_ASSERT(r == 1 && "inverse of a non-invertible element");
+    KEEL_CAS_ASSERT(r == 1 && "inverse of a non-invertible element");
     keel::i64 result = t;
     if (result < 0)
         result += keel::as<keel::i64>(p);
@@ -179,7 +179,7 @@ keel::u64 FpPoly::invModP(keel::u64 a, keel::u64 p)
 void FpPoly::divMod(const FpPoly &a, const FpPoly &b, FpPoly &q, FpPoly &r)
 {
     FpPoly::checkSameField(a, b);
-    KEEL_ASSERT(!b.isZero() && b.hasP());
+    KEEL_CAS_ASSERT(!b.isZero() && b.hasP());
     const keel::u64 p = b.p_;
     r = a;
     r.p_ = p;
@@ -248,7 +248,7 @@ void FpPoly::extGcd(const FpPoly &a, const FpPoly &b, FpPoly &s, FpPoly &t)
         t0 = t1;
         t1 = t2;
     }
-    KEEL_ASSERT(!r0.isZero());
+    KEEL_CAS_ASSERT(!r0.isZero());
     const keel::u64 inv = invModP(r0.lc(), p);
     s = s0 * inv;
     t = t0 * inv;
@@ -256,7 +256,7 @@ void FpPoly::extGcd(const FpPoly &a, const FpPoly &b, FpPoly &s, FpPoly &t)
 
 FpPoly FpPoly::powMod(const BigInt &e, const FpPoly &m) const
 {
-    KEEL_ASSERT(!m.isZero() && m.hasP());
+    KEEL_CAS_ASSERT(!m.isZero() && m.hasP());
     FpPoly result = constant(m.p_, 1);
     FpPoly base = *this;
     base.p_ = m.p_;
@@ -301,7 +301,7 @@ namespace {
 // g have degree d. Deterministic via the fixed-seed PRNG.
 void edf(const FpPoly &g, keel::i32 d, keel::Array<FpPoly> &out, keel::u64 &rng)
 {
-    KEEL_ASSERT(!g.isZero());
+    KEEL_CAS_ASSERT(!g.isZero());
     if (g.deg() < d) {
         out.push_back(g);
         return;
@@ -328,7 +328,7 @@ void edf(const FpPoly &g, keel::i32 d, keel::Array<FpPoly> &out, keel::u64 &rng)
         if (!h.isZero() && h.deg() > 0 && h.deg() < g.deg()) {
             FpPoly q, r;
             FpPoly::divMod(g, h, q, r);
-            KEEL_ASSERT(r.isZero());
+            KEEL_CAS_ASSERT(r.isZero());
             edf(h, d, out, rng);
             edf(q, d, out, rng);
             return;
@@ -340,7 +340,7 @@ void edf(const FpPoly &g, keel::i32 d, keel::Array<FpPoly> &out, keel::u64 &rng)
 
 keel::Array<FpPoly> FpPoly::factor(const FpPoly &f)
 {
-    KEEL_ASSERT(f.hasP() && !f.isZero());
+    KEEL_CAS_ASSERT(f.hasP() && !f.isZero());
     const keel::u64 p = f.p();
     keel::Array<FpPoly> out;
     if (f.deg() < 1)
@@ -355,7 +355,7 @@ keel::Array<FpPoly> FpPoly::factor(const FpPoly &f)
     } else {
         FpPoly q, r;
         FpPoly::divMod(f, g, q, r);
-        KEEL_ASSERT(r.isZero());
+        KEEL_CAS_ASSERT(r.isZero());
         sf = q;
     }
     if (sf.deg() < 1)
@@ -378,7 +378,7 @@ keel::Array<FpPoly> FpPoly::factor(const FpPoly &f)
                 edf(fac, degd, out, rng);
             FpPoly q, r;
             FpPoly::divMod(rest, fac, q, r);
-            KEEL_ASSERT(r.isZero());
+            KEEL_CAS_ASSERT(r.isZero());
             rest = q;
             h = h % rest;
         }

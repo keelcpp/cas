@@ -81,7 +81,7 @@ Rational fieldTrace(const UPoly &p, const keel::Array<Rational> &s)
 UPoly interpolateRational(const keel::Array<Rational> &xs,
                           const keel::Array<Rational> &ys)
 {
-    KEEL_ASSERT(xs.size() == ys.size());
+    KEEL_CAS_ASSERT(xs.size() == ys.size());
     keel::Array<Rational> coeffs(xs.size(), R0());
     for (keel::usize i = 0; i < xs.size(); ++i) {
         if (ys[i].isZero())
@@ -128,7 +128,7 @@ keel::Array<UPoly> partialFractions(const UPoly &N,
         Bs.push_back(bi);
         UPoly q, r;
         UPoly::divMod(rem - bi * prod, Ps[idx], q, r);
-        KEEL_ASSERT(r.isZero());
+        KEEL_CAS_ASSERT(r.isZero());
         rem = q;
     }
     return Bs;
@@ -267,7 +267,7 @@ bool integrateSplitting(const UPoly &A, const UPoly &F,
         roots.push_back(rt);
         UPoly q, r;
         UPoly::divMod(rest, UPoly(keel::Array<Rational>{Rational(-rt), R1()}), q, r);
-        KEEL_ASSERT(r.isZero());
+        KEEL_CAS_ASSERT(r.isZero());
         rest = q;
     }
 
@@ -450,10 +450,10 @@ bool integrateSquarefree(Ctx &c, Expr var, const UPoly &A, const UPoly &F,
         if (!g.isConst()) {
             UPoly q, r;
             UPoly::divMod(leftN, g, q, r);
-            KEEL_ASSERT(r.isZero());
+            KEEL_CAS_ASSERT(r.isZero());
             leftN = q;
             UPoly::divMod(leftD, g, q, r);
-            KEEL_ASSERT(r.isZero());
+            KEEL_CAS_ASSERT(r.isZero());
             leftD = q;
         }
         if (leftN.isZero())
@@ -834,7 +834,7 @@ bool integrateSquarefree(Ctx &c, Expr var, const UPoly &A, const UPoly &F,
 
 UPoly resultantT(const UPoly &P, const UPoly &Q, const UPoly &M)
 {
-    KEEL_ASSERT(!M.isZero());
+    KEEL_CAS_ASSERT(!M.isZero());
     const keel::i32 n = M.deg();
     if (n < 1)
         return UPoly(R1()); // res of anything with a constant is 1 by convention
@@ -953,7 +953,7 @@ bool toRational(Ctx &c, Expr e, Expr var, UPoly &num, UPoly &den)
 
 HermiteResult hermiteReduce(const UPoly &N0, const UPoly &D0)
 {
-    KEEL_ASSERT(!D0.isZero());
+    KEEL_CAS_ASSERT(!D0.isZero());
     HermiteResult out;
     out.rd = UPoly(R1());
     out.S = UPoly(R1());
@@ -1014,7 +1014,7 @@ HermiteResult hermiteReduce(const UPoly &N0, const UPoly &D0)
                                Rational(keel::as<keel::i64>(j - 1)) * C * dF);
             UPoly q, r;
             UPoly::divMod(rhs, F, q, r);
-            KEEL_ASSERT(r.isZero());
+            KEEL_CAS_ASSERT(r.isZero());
             A[keel::as<keel::usize>(j - 1)] = A[keel::as<keel::usize>(j - 1)] + q;
         }
 

@@ -7,6 +7,14 @@
 #include "keel/core.h"
 #include "keel/string.h"
 
+#if !defined(KEEL_CAS_ASSERT)
+#if defined(NDEBUG)
+#define KEEL_CAS_ASSERT(cond) ((void)0)
+#else
+#define KEEL_CAS_ASSERT(cond) KEEL_ASSERT(cond)
+#endif
+#endif
+
 namespace keel::cas {
 
 class BigInt {

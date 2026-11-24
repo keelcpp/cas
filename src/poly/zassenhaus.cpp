@@ -144,7 +144,7 @@ void bpNormalize(keel::Array<BigInt> &a)
         for (BigInt &c : a) {
             BigInt q, r;
             BigInt::divMod(c, cont, q, r);
-            KEEL_ASSERT(r.isZero());
+            KEEL_CAS_ASSERT(r.isZero());
             c = q;
         }
     }
@@ -205,7 +205,7 @@ void henselStep(keel::ArrayRef<BigInt> target,
     for (const BigInt &c : e) {
         BigInt q, r;
         BigInt::divMod(c, m, q, r);
-        KEEL_ASSERT(r.isZero() && "henselStep: congruence invariant broken");
+        KEEL_CAS_ASSERT(r.isZero() && "henselStep: congruence invariant broken");
         eFpCs.push_back(modP(q, p));
     }
     const FpPoly eFp(p, keel::move(eFpCs));
@@ -306,7 +306,7 @@ factorPrimitiveInteger(keel::ArrayRef<BigInt> fIn, Budget *budget)
         return {};
     keel::Array<BigInt> f = keel::Array<BigInt>::from(fIn);
     bpTrim(f);
-    KEEL_ASSERT(!f.empty() && f.size() >= 2 && "need degree >= 1");
+    KEEL_CAS_ASSERT(!f.empty() && f.size() >= 2 && "need degree >= 1");
     // Strip the content: the caller gets the factors of the primitive
     // part (a non-unit content is the caller's business).
     bpNormalize(f);
@@ -336,7 +336,7 @@ factorPrimitiveInteger(keel::ArrayRef<BigInt> fIn, Budget *budget)
     const keel::usize r = gFp.size();
     if (r <= 1)
         return singletonPoly(keel::move(f)); // irreducible mod p => irreducible over Q
-    KEEL_ASSERT(r < 32 && "subset enumeration limit");
+    KEEL_CAS_ASSERT(r < 32 && "subset enumeration limit");
     // All gFp are MONIC: the lift runs against the monic associate of f
     // (absorbing lc mod p into a factor would freeze the product's
     // leading coefficient and break the congruence for k >= 3: the

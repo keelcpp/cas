@@ -35,7 +35,7 @@ void UPoly::trim()
 
 void UPoly::makeMonic()
 {
-    KEEL_ASSERT(!isZero());
+    KEEL_CAS_ASSERT(!isZero());
     const Rational inv = Rational(keel::i64{1}) / lc();
     for (Rational &c : c_)
         c *= inv;
@@ -44,7 +44,7 @@ void UPoly::makeMonic()
 
 const Rational &UPoly::lc() const
 {
-    KEEL_ASSERT(!isZero());
+    KEEL_CAS_ASSERT(!isZero());
     return c_.back();
 }
 
@@ -116,7 +116,7 @@ UPoly operator*(const Rational &k, const UPoly &a)
 
 void UPoly::divMod(const UPoly &a, const UPoly &b, UPoly &q, UPoly &r)
 {
-    KEEL_ASSERT(!b.isZero() && "UPoly division by zero");
+    KEEL_CAS_ASSERT(!b.isZero() && "UPoly division by zero");
     const UPoly aCopy = a;
     const UPoly bCopy = b;
     r = aCopy;
@@ -145,7 +145,7 @@ UPoly operator%(const UPoly &a, const UPoly &b)
 
 UPoly UPoly::invMod(const UPoly &u, const UPoly &m)
 {
-    KEEL_ASSERT(!m.isZero());
+    KEEL_CAS_ASSERT(!m.isZero());
     // Monic extended Euclid: normalizing the remainder chain keeps the
     // cofactor coefficients at polynomial growth instead of the
     // exponential blow-up of the raw PRS (the quadratic/cubic ring
@@ -175,7 +175,7 @@ UPoly UPoly::invMod(const UPoly &u, const UPoly &m)
         }
         r1 = r;
     }
-    KEEL_ASSERT(r0.isConst() && !r0.isZero() && "invMod: gcd is not a constant");
+    KEEL_CAS_ASSERT(r0.isConst() && !r0.isZero() && "invMod: gcd is not a constant");
     return s0; // r0 is the monic constant 1, so s0*u == 1 (mod m)
 }
 
@@ -236,13 +236,13 @@ UPoly UPoly::squarefreePart() const
         return *this;
     UPoly q, r;
     divMod(*this, g, q, r);
-    KEEL_ASSERT(r.isZero());
+    KEEL_CAS_ASSERT(r.isZero());
     return q;
 }
 
 keel::Array<UPoly> UPoly::squarefreeDecomposition() const
 {
-    KEEL_ASSERT(!isZero() && "squarefreeDecomposition of zero");
+    KEEL_CAS_ASSERT(!isZero() && "squarefreeDecomposition of zero");
     // Yun's algorithm operates on the monic associate; the identity
     // A == lc(A) * F_1^1 * ... * F_k^k carries the scalar separately.
     UPoly am = *this;

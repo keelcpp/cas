@@ -20,7 +20,7 @@ const Rational R1()
 
 void ModCPoly::checkSameRing(const ModCPoly &a, const ModCPoly &b)
 {
-    KEEL_ASSERT((!a.hasRing() || !b.hasRing() || a.ring_ == b.ring_) &&
+    KEEL_CAS_ASSERT((!a.hasRing() || !b.hasRing() || a.ring_ == b.ring_) &&
            "ModCPoly operands from different rings");
 }
 
@@ -28,7 +28,7 @@ void ModCPoly::checkSameRing(const ModCPoly &a, const ModCPoly &b)
 
 ModCRing::ModCRing(UPoly c)
 {
-    KEEL_ASSERT(!c.isZero() && c.deg() >= 1);
+    KEEL_CAS_ASSERT(!c.isZero() && c.deg() >= 1);
     c.makeMonic();
     c_ = keel::move(c);
     zero_ = UPoly();
@@ -57,7 +57,7 @@ UPoly ModCRing::mul(const UPoly &a, const UPoly &b) const
         // division-based reduction inside the hot Euclidean loops
         // (thousands of ring multiplications per gcd, each formerly
         // paying a full polynomial division in reduce()).
-        KEEL_ASSERT(a.deg() < 2 && b.deg() < 2 && "ring element out of normal form");
+        KEEL_CAS_ASSERT(a.deg() < 2 && b.deg() < 2 && "ring element out of normal form");
         const Rational &p = c_.coeff(1);
         const Rational &q = c_.coeff(0);
         const Rational &a0 = a.coeff(0);
@@ -74,7 +74,7 @@ UPoly ModCRing::mul(const UPoly &a, const UPoly &b) const
         // (same rationale as the quadratic case: the RootOf branch's
         // per-point loops pay thousands of ring multiplications, and
         // reduce() is a division there).
-        KEEL_ASSERT(a.deg() < 3 && b.deg() < 3 && "ring element out of normal form");
+        KEEL_CAS_ASSERT(a.deg() < 3 && b.deg() < 3 && "ring element out of normal form");
         const Rational &k2 = c_.coeff(2);
         const Rational &k1 = c_.coeff(1);
         const Rational &k0 = c_.coeff(0);
@@ -101,19 +101,19 @@ UPoly ModCRing::div(const UPoly &a, const UPoly &b) const
 
 UPoly ModCRing::inv(const UPoly &a) const
 {
-    KEEL_ASSERT(!a.isZero());
+    KEEL_CAS_ASSERT(!a.isZero());
     if (c_.deg() == 2) {
         // Quadratic conjugate t -> -p - t: (a0 + a1*t) * conj(a) is
         // the rational norm N = a0^2 - p*a0*a1 + q*a1^2, nonzero for
         // a != 0 because c is irreducible (the ring is a field), so
         // the inverse is conj(a)/N — no extended Euclid.
-        KEEL_ASSERT(a.deg() < 2 && "ring element out of normal form");
+        KEEL_CAS_ASSERT(a.deg() < 2 && "ring element out of normal form");
         const Rational &p = c_.coeff(1);
         const Rational &q = c_.coeff(0);
         const Rational &a0 = a.coeff(0);
         const Rational a1 = a.coeff(1);
         const Rational n = a0 * a0 - p * a0 * a1 + q * a1 * a1;
-        KEEL_ASSERT(!n.isZero() && "nonzero element has zero norm: c reducible?");
+        KEEL_CAS_ASSERT(!n.isZero() && "nonzero element has zero norm: c reducible?");
         const Rational i0 = (a0 - p * a1) / n;
         const Rational i1 = Rational(keel::i64{-1}) * a1 / n;
         return UPoly(keel::Array<Rational>{i0, i1});
@@ -130,7 +130,7 @@ bool ModCRing::isOne(const UPoly &a) const
 
 const ModCRing &ModCPoly::ring() const
 {
-    KEEL_ASSERT(ring_ != nullptr);
+    KEEL_CAS_ASSERT(ring_ != nullptr);
     return *ring_;
 }
 
@@ -144,7 +144,7 @@ ModCPoly::ModCPoly(const ModCRing &ring, keel::Array<UPoly> coeffs)
     : ring_(&ring), c_(keel::move(coeffs))
 {
     for (UPoly &c : c_) {
-        KEEL_ASSERT(c.deg() < ring_->modulus().deg() && "unreduced coefficient");
+        KEEL_CAS_ASSERT(c.deg() < ring_->modulus().deg() && "unreduced coefficient");
         c = ring_->reduce(c);
     }
     trim();
@@ -166,7 +166,7 @@ ModCPoly ModCPoly::monomial(const ModCRing &ring, UPoly c0, keel::usize exp)
 
 const UPoly &ModCPoly::lc() const
 {
-    KEEL_ASSERT(!isZero());
+    KEEL_CAS_ASSERT(!isZero());
     return c_.back();
 }
 
@@ -174,7 +174,7 @@ ModCPoly operator+(const ModCPoly &a, const ModCPoly &b)
 {
     ModCPoly::checkSameRing(a, b);
     const ModCRing *rg = a.hasRing() ? a.ring_ : b.ring_;
-    KEEL_ASSERT(rg != nullptr);
+    KEEL_CAS_ASSERT(rg != nullptr);
     keel::Array<UPoly> cs;
     cs.reserve(keel::max(a.c_.size(), b.c_.size()));
     for (keel::usize i = 0; i < keel::max(a.c_.size(), b.c_.size()); ++i)
@@ -186,7 +186,7 @@ ModCPoly operator-(const ModCPoly &a, const ModCPoly &b)
 {
     ModCPoly::checkSameRing(a, b);
     const ModCRing *rg = a.hasRing() ? a.ring_ : b.ring_;
-    KEEL_ASSERT(rg != nullptr);
+    KEEL_CAS_ASSERT(rg != nullptr);
     keel::Array<UPoly> cs;
     cs.reserve(keel::max(a.c_.size(), b.c_.size()));
     for (keel::usize i = 0; i < keel::max(a.c_.size(), b.c_.size()); ++i)
@@ -223,7 +223,7 @@ void ModCPoly::divMod(const ModCPoly &a, const ModCPoly &b,
                       ModCPoly &q, ModCPoly &r)
 {
     ModCPoly::checkSameRing(a, b);
-    KEEL_ASSERT(!b.isZero() && b.hasRing());
+    KEEL_CAS_ASSERT(!b.isZero() && b.hasRing());
     const ModCRing &ring = b.ring();
     r = a;
     q = ModCPoly();
@@ -246,7 +246,7 @@ void ModCPoly::divMod(const ModCPoly &a, const ModCPoly &b,
 
 void ModCPoly::makeMonic()
 {
-    KEEL_ASSERT(!isZero());
+    KEEL_CAS_ASSERT(!isZero());
     const UPoly k = ring_->inv(lc());
     for (UPoly &c : c_)
         c = ring_->mul(c, k);

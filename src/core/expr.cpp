@@ -108,14 +108,14 @@ Expr Ctx::rootOf(keel::Array<Rational> poly, keel::i32 index)
 {
     while (poly.size() > 1 && poly.back().isZero())
         poly.pop_back();
-    KEEL_ASSERT(poly.size() >= 3 && "RootOf needs degree >= 2");
+    KEEL_CAS_ASSERT(poly.size() >= 3 && "RootOf needs degree >= 2");
     const Rational lc = poly.back();
-    KEEL_ASSERT(!(lc == Rational(keel::i64{0})) && "RootOf of zero polynomial");
-    KEEL_ASSERT(index >= 0);
+    KEEL_CAS_ASSERT(!(lc == Rational(keel::i64{0})) && "RootOf of zero polynomial");
+    KEEL_CAS_ASSERT(index >= 0);
     if (!(lc == Rational(keel::i64{1})))
         for (Rational &c : poly)
             c = c / lc;
-    KEEL_ASSERT(index < keel::as<keel::i32>(poly.size()) - 1);
+    KEEL_CAS_ASSERT(index < keel::as<keel::i32>(poly.size()) - 1);
 
     keel::u32 hash = mix32(kFnvOffset, keel::as<keel::u32>(NodeKind::RootOf));
     hash = mix32(hash, keel::as<keel::u32>(index));
@@ -138,13 +138,13 @@ Expr Ctx::rootOf(keel::Array<Rational> poly, keel::i32 index)
 
 const keel::Array<Rational> &Ctx::rootOfPoly(Expr e) const
 {
-    KEEL_ASSERT(kind(e) == NodeKind::RootOf);
+    KEEL_CAS_ASSERT(kind(e) == NodeKind::RootOf);
     return rootofs_[node(e).aux].poly;
 }
 
 keel::i32 Ctx::rootOfIndex(Expr e) const
 {
-    KEEL_ASSERT(kind(e) == NodeKind::RootOf);
+    KEEL_CAS_ASSERT(kind(e) == NodeKind::RootOf);
     return rootofs_[node(e).aux].index;
 }
 
@@ -156,7 +156,7 @@ Expr Ctx::neg(Expr a)
 Expr Ctx::div(Expr a, Expr b)
 {
     if (kind(b) == NodeKind::Number) {
-        KEEL_ASSERT(!numberValue(b).isZero() && "division by zero constant");
+        KEEL_CAS_ASSERT(!numberValue(b).isZero() && "division by zero constant");
         if (numberValue(b).isZero())
             return Expr(); // null in Release: no 0^-1 garbage nodes
     }
@@ -195,7 +195,7 @@ Expr Ctx::pow(Expr base, Expr exp)
                 return number(r);
             }
             if (b.isZero()) {
-                KEEL_ASSERT(!"zero raised to a negative power");
+                KEEL_CAS_ASSERT(!"zero raised to a negative power");
                 return Expr(); // null in Release: no 0^-k garbage nodes
             }
             // b != 0, n < 0: (p/q)^n = q^|n| / p^|n|
@@ -254,7 +254,7 @@ Expr Ctx::makeAdd(keel::ArrayRef<Expr> children)
         acc.push_back({term, coef});
     };
     for (Expr c : children) {
-        KEEL_ASSERT(!c.isNull());
+        KEEL_CAS_ASSERT(!c.isNull());
         if (kind(c) == NodeKind::Number) {
             constSum += numberValue(c);
         } else if (kind(c) == NodeKind::Add) {
@@ -289,7 +289,7 @@ Expr Ctx::makeAdd(keel::ArrayRef<Expr> children)
 #ifndef NDEBUG
     for (keel::usize i = 0; i < items.size(); ++i)
         for (keel::usize j = i + 1; j < items.size(); ++j)
-            KEEL_ASSERT(items[i] != items[j] && "makeAdd duplicate items");
+            KEEL_CAS_ASSERT(items[i] != items[j] && "makeAdd duplicate items");
 #endif
     keel::sort(items,
                [this](Expr a, Expr b) { return compare(a, b) < 0; });
@@ -321,7 +321,7 @@ Expr Ctx::makeMul(keel::ArrayRef<Expr> children)
         acc.push_back({base, exp});
     };
     for (Expr c : children) {
-        KEEL_ASSERT(!c.isNull());
+        KEEL_CAS_ASSERT(!c.isNull());
         if (kind(c) == NodeKind::Number) {
             constProd *= numberValue(c);
         } else if (kind(c) == NodeKind::Mul) {
@@ -358,7 +358,7 @@ Expr Ctx::makeMul(keel::ArrayRef<Expr> children)
 #ifndef NDEBUG
     for (keel::usize i = 0; i < items.size(); ++i)
         for (keel::usize j = i + 1; j < items.size(); ++j)
-            KEEL_ASSERT(items[i] != items[j] && "makeMul duplicate items");
+            KEEL_CAS_ASSERT(items[i] != items[j] && "makeMul duplicate items");
 #endif
     keel::sort(items,
                [this](Expr a, Expr b) { return compare(a, b) < 0; });
@@ -420,20 +420,20 @@ bool Ctx::equalNode(const Node &n, NodeKind kind, keel::u32 aux,
 
 const keel::String &Ctx::symbolName(Expr e) const
 {
-    KEEL_ASSERT(kind(e) == NodeKind::Symbol);
+    KEEL_CAS_ASSERT(kind(e) == NodeKind::Symbol);
     return symbolNames_[node(e).aux];
 }
 
 const keel::String &Ctx::funcName(Expr e) const
 {
-    KEEL_ASSERT(kind(e) == NodeKind::Func);
+    KEEL_CAS_ASSERT(kind(e) == NodeKind::Func);
     return funcNames_[node(e).aux];
 }
 
 Expr Ctx::child(Expr e, keel::usize i) const
 {
     const Node &n = node(e);
-    KEEL_ASSERT(i < n.childCount);
+    KEEL_CAS_ASSERT(i < n.childCount);
     return Expr(const_cast<Ctx *>(this), childArena_[n.childOff + i]);
 }
 
@@ -453,7 +453,7 @@ keel::i32 Ctx::kindRank(NodeKind k)
 
 keel::i32 Ctx::compare(Expr a, Expr b) const
 {
-    KEEL_ASSERT(!a.isNull() && !b.isNull());
+    KEEL_CAS_ASSERT(!a.isNull() && !b.isNull());
     const Node &na = node(a);
     const Node &nb = node(b);
     if (na.kind != nb.kind)
@@ -3678,7 +3678,7 @@ void Ctx::assume(keel::StringRef name, AssumeDomain dom)
 
 void Ctx::assume(Expr sym, AssumeDomain dom)
 {
-    KEEL_ASSERT(!sym.isNull() && kind(sym) == NodeKind::Symbol);
+    KEEL_CAS_ASSERT(!sym.isNull() && kind(sym) == NodeKind::Symbol);
     if (!sym.isNull() && kind(sym) == NodeKind::Symbol)
         assume(symbolName(sym), dom);
 }
@@ -3692,7 +3692,7 @@ AssumeDomain Ctx::assumption(keel::StringRef name) const
 
 AssumeDomain Ctx::assumption(Expr sym) const
 {
-    KEEL_ASSERT(!sym.isNull() && kind(sym) == NodeKind::Symbol);
+    KEEL_CAS_ASSERT(!sym.isNull() && kind(sym) == NodeKind::Symbol);
     if (sym.isNull() || kind(sym) != NodeKind::Symbol)
         return AssumeDomain::Any;
     return assumption(symbolName(sym));

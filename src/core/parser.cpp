@@ -220,7 +220,7 @@ private:
         case Tok::Star: return c_.mul({a, b});
         case Tok::Slash: return c_.div(a, b);
         case Tok::Caret: return c_.pow(a, b);
-        default: KEEL_ASSERT(false && "not a binary token"); return {};
+        default: KEEL_CAS_ASSERT(false && "not a binary token"); return {};
         }
     }
 

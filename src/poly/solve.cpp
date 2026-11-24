@@ -10,7 +10,7 @@ namespace keel::cas {
 
 keel::Array<RealRootSolution> solveRealRoots(const UPoly &p)
 {
-    KEEL_ASSERT(!p.isZero() && "solveRealRoots of the zero polynomial");
+    KEEL_CAS_ASSERT(!p.isZero() && "solveRealRoots of the zero polynomial");
     keel::Array<RealRootSolution> out;
     if (p.deg() < 1)
         return out; // non-zero constant: no roots
@@ -54,16 +54,16 @@ keel::Array<RealRootSolution> solveRealRoots(const UPoly &p)
         if (matched) {
             s.isRational = true;
             s.value = rationals[nextRational];
-            KEEL_ASSERT(sq.eval(s.value).isZero() &&
+            KEEL_CAS_ASSERT(sq.eval(s.value).isZero() &&
                    "matched rational is not a root");
             ++nextRational;
         } else {
-            KEEL_ASSERT(!ivs[k].exact() &&
+            KEEL_CAS_ASSERT(!ivs[k].exact() &&
                    "exact interval without a rational root: inconsistent");
         }
         out.push_back(keel::move(s));
     }
-    KEEL_ASSERT(nextRational == rationals.size() &&
+    KEEL_CAS_ASSERT(nextRational == rationals.size() &&
            "unmatched rational root: isolation inconsistent");
     return out;
 }

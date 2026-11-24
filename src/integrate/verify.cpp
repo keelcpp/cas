@@ -47,7 +47,7 @@ bool containsZero(const RIval &a)
 
 RIval iDiv(const RIval &a, const RIval &b)
 {
-    KEEL_ASSERT(!containsZero(b));
+    KEEL_CAS_ASSERT(!containsZero(b));
     return iMul(a, RIval{Rational(keel::i64{1}) / b.hi,
                          Rational(keel::i64{1}) / b.lo});
 }
@@ -69,8 +69,8 @@ RIval iPowInt(const RIval &a, keel::i64 n)
 // enclosure satisfies lo^q <= r <= hi^q.
 RIval qRoot(const Rational &r, keel::i64 q)
 {
-    KEEL_ASSERT(q >= 2);
-    KEEL_ASSERT(r >= Rational(keel::i64{0}));
+    KEEL_CAS_ASSERT(q >= 2);
+    KEEL_CAS_ASSERT(r >= Rational(keel::i64{0}));
     const Rational one(1);
     Rational lo(0), hi = r < one ? one : r;
     const keel::u64 qe = keel::as<keel::u64>(q);

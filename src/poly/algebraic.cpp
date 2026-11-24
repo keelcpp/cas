@@ -42,12 +42,12 @@ Algebraic::Algebraic(Rational r)
 
 Algebraic::Algebraic(UPoly p, RootInterval iv)
 {
-    KEEL_ASSERT(!p.isZero() && p.deg() >= 1);
-    KEEL_ASSERT(UPoly::gcd(p, p.derivative()).isConst() &&
+    KEEL_CAS_ASSERT(!p.isZero() && p.deg() >= 1);
+    KEEL_CAS_ASSERT(UPoly::gcd(p, p.derivative()).isConst() &&
            "defining polynomial must be squarefree");
     // Rationals normalize to the canonical linear form.
     if (iv.exact()) {
-        KEEL_ASSERT(p.eval(iv.lo).isZero());
+        KEEL_CAS_ASSERT(p.eval(iv.lo).isZero());
         poly_ = linearOf(iv.lo);
         iv_ = RootInterval{iv.lo, iv.lo};
         return;
@@ -76,7 +76,7 @@ keel::Array<Algebraic> Algebraic::realRoots(const UPoly &p)
 
 Rational Algebraic::rationalValue() const
 {
-    KEEL_ASSERT(isRational());
+    KEEL_CAS_ASSERT(isRational());
     return R0() - poly_.coeff(0);
 }
 

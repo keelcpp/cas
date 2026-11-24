@@ -27,7 +27,7 @@ keel::Array<UPoly> sturmSequence(const UPoly &p)
 
 Rational cauchyRootBound(const UPoly &p)
 {
-    KEEL_ASSERT(!p.isZero());
+    KEEL_CAS_ASSERT(!p.isZero());
     const Rational an = p.lc().abs();
     Rational m(0);
     for (keel::usize i = 0; i + 1 < p.coeffs().size(); ++i)
@@ -64,8 +64,8 @@ keel::usize variations(keel::ArrayRef<UPoly> sturm, const Rational &x)
 keel::usize countRealRoots(keel::ArrayRef<UPoly> sturm,
                            const Rational &a, const Rational &b)
 {
-    KEEL_ASSERT(!sturm.empty());
-    KEEL_ASSERT(a < b);
+    KEEL_CAS_ASSERT(!sturm.empty());
+    KEEL_CAS_ASSERT(a < b);
     return variations(sturm, a) - variations(sturm, b);
 }
 

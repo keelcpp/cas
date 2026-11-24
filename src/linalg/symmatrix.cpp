@@ -570,7 +570,7 @@ SymMatrix::SymMatrix(keel::usize rows, keel::usize cols,
                      keel::Array<Expr> entries)
     : rows_(rows), cols_(cols), data_(keel::move(entries))
 {
-    KEEL_ASSERT(data_.size() == rows_ * cols_);
+    KEEL_CAS_ASSERT(data_.size() == rows_ * cols_);
 }
 
 SymMatrix SymMatrix::zeros(Ctx &c, keel::usize rows, keel::usize cols)

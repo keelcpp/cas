@@ -7,7 +7,7 @@ Expr Ctx::diff(Expr e, Expr var)
 {
     if (e.isNull() || var.isNull())
         return Expr();
-    KEEL_ASSERT(kind(var) == NodeKind::Symbol && "diff variable must be a Symbol");
+    KEEL_CAS_ASSERT(kind(var) == NodeKind::Symbol && "diff variable must be a Symbol");
     keel::HashMap<keel::u32, Expr> memo;
     return diffRec(e, var, memo);
 }
@@ -562,7 +562,7 @@ Expr Ctx::diffRec(Expr e, Expr var, keel::HashMap<keel::u32, Expr> &memo)
         } else if (name == "dF2") {
             result = mul({func("ddF2", u), du});
         } else {
-            KEEL_ASSERT(!"diff: unsupported function");
+            KEEL_CAS_ASSERT(!"diff: unsupported function");
             result = Expr();
         }
         break;

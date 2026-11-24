@@ -81,13 +81,13 @@ public:
     bool isNull() const { return ctx_ == nullptr; }
     Ctx &ctx() const
     {
-        KEEL_ASSERT(ctx_ != nullptr);
+        KEEL_CAS_ASSERT(ctx_ != nullptr);
         return *ctx_;
     }
 
     friend bool operator==(const Expr &a, const Expr &b)
     {
-        KEEL_ASSERT(a.ctx_ == b.ctx_ && "Expr from different Ctx");
+        KEEL_CAS_ASSERT(a.ctx_ == b.ctx_ && "Expr from different Ctx");
         return a.id_ == b.id_;
     }
     friend bool operator!=(const Expr &a, const Expr &b) { return !(a == b); }
@@ -238,7 +238,7 @@ public:
     // Stable per-Ctx node identity (1-based; matches insertion order).
     keel::u32 id(Expr e) const
     {
-        KEEL_ASSERT(e.ctx_ == this && !e.isNull());
+        KEEL_CAS_ASSERT(e.ctx_ == this && !e.isNull());
         return e.id_;
     }
 
@@ -260,7 +260,7 @@ private:
 
     const Node &node(Expr e) const
     {
-        KEEL_ASSERT(e.ctx_ == this && !e.isNull());
+        KEEL_CAS_ASSERT(e.ctx_ == this && !e.isNull());
         return nodes_[e.id_ - 1];
     }
 
