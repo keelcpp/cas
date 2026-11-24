@@ -154,6 +154,61 @@ if(KEEL_CAS_BUILD_TESTS)
     endif()
     add_test(NAME test_cas COMMAND test_cas)
 
+    if(NOT KEEL_CAS_NO_EXCEPTIONS_RTTI)
+        if(NOT TARGET GTest::gtest_main)
+            include(FetchContent)
+            set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+            set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+            set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+            FetchContent_Declare(
+                googletest
+                GIT_REPOSITORY https://github.com/google/googletest.git
+                GIT_TAG        v1.14.0
+                GIT_SHALLOW    TRUE
+            )
+            FetchContent_MakeAvailable(googletest)
+        endif()
+
+        add_executable(keel_cas_gtest
+            tests/num/bigint_test.cpp
+            tests/num/rational_test.cpp
+            tests/num/ifactor_test.cpp
+            tests/core/expr_test.cpp
+            tests/core/diff_test.cpp
+            tests/core/rootof_test.cpp
+            tests/core/parser_test.cpp
+            tests/core/subs_test.cpp
+            tests/core/eval_test.cpp
+            tests/core/expand_test.cpp
+            tests/core/series_test.cpp
+            tests/core/simplify_test.cpp
+            tests/core/symsolve_test.cpp
+            tests/poly/upoly_test.cpp
+            tests/poly/sturm_test.cpp
+            tests/poly/solve_test.cpp
+            tests/poly/algebraic_test.cpp
+            tests/poly/modcpoly_test.cpp
+            tests/poly/fppoly_test.cpp
+            tests/poly/zassenhaus_test.cpp
+            tests/poly/groebner_test.cpp
+            tests/integrate/ratint_test.cpp
+            tests/linalg/symmatrix_test.cpp
+            tests/ode/dsolve_test.cpp
+            tests/corpus_runner_test.cpp
+            tests/corpus_runner.cpp
+            tests/rubi/rules_test.cpp
+            tests/transform/fourier_test.cpp
+            tests/transform/laplace_test.cpp
+            tests/transform/ztrans_test.cpp
+        )
+        target_include_directories(keel_cas_gtest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(keel_cas_gtest PRIVATE keel::cas GTest::gtest_main)
+        if(MSVC)
+            target_compile_options(keel_cas_gtest PRIVATE /MP /bigobj)
+        endif()
+        add_test(NAME keel_cas_gtest COMMAND keel_cas_gtest)
+    endif()
+
     get_target_property(KEEL_CORE_INC_DIRS keel::keel INTERFACE_INCLUDE_DIRECTORIES)
     get_target_property(KEEL_BIGNUM_INC_DIRS keel::bignum INTERFACE_INCLUDE_DIRECTORIES)
     set(KEEL_DEP_INC_CLEAN "")

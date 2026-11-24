@@ -614,13 +614,13 @@ LaplaceResult laplaceRec(Ctx &c, Expr f, Expr t, Expr s, Budget *budget,
         }
         // Abstract symbolic function (e.g. y(t) from syms y(t)): return unevaluated laplace(y(t), t, s).
         if (c.childCount(f) == 1 && c.child(f, 0) == t) {
-            const keel::String &fn = c.funcName(f);
+            const keel::String &fname = c.funcName(f);
             const bool isKnownBuiltin =
-                fn == "exp" || fn == "log" || fn == "sqrt" || fn == "abs" || fn == "sign" ||
-                fn == "sin" || fn == "cos" || fn == "tan" || fn == "asin" || fn == "acos" || fn == "atan" ||
-                fn == "sinh" || fn == "cosh" || fn == "tanh" || fn == "asinh" || fn == "acosh" || fn == "atanh" ||
-                fn == "erf" || fn == "erfc" || fn == "erfi" || fn == "gamma" || fn == "heaviside" ||
-                fn == "dirac" || fn == "zeta" || fn == "Ei" || fn == "laplace" || fn == "ilaplace";
+                fname == "exp" || fname == "log" || fname == "sqrt" || fname == "abs" || fname == "sign" ||
+                fname == "sin" || fname == "cos" || fname == "tan" || fname == "asin" || fname == "acos" || fname == "atan" ||
+                fname == "sinh" || fname == "cosh" || fname == "tanh" || fname == "asinh" || fname == "acosh" || fname == "atanh" ||
+                fname == "erf" || fname == "erfc" || fname == "erfi" || fname == "gamma" || fname == "heaviside" ||
+                fname == "dirac" || fname == "zeta" || fname == "Ei" || fname == "laplace" || fname == "ilaplace";
             if (!isKnownBuiltin) {
                 out.status = LaplaceResult::Status::ProvedSymbolic;
                 out.F = c.func("laplace", {f, t, s});

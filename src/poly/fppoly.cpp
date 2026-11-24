@@ -36,6 +36,8 @@ keel::u64 fpNext(keel::u64 &state)
 
 void FpPoly::checkSameField(const FpPoly &a, const FpPoly &b)
 {
+    (void)a;
+    (void)b;
     KEEL_CAS_ASSERT((!a.hasP() || !b.hasP() || a.p_ == b.p_) && "FpPoly field mismatch");
 }
 

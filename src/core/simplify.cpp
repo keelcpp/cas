@@ -784,10 +784,10 @@ Expr simplifyAddNode(Ctx &c, Expr e)
             return true;
         };
 
-        bool changed = true;
-        while (changed && terms.size() >= 2) {
-            changed = false;
-            for (keel::usize i = 0; i < terms.size() && !changed; ++i) {
+        bool beChanged = true;
+        while (beChanged && terms.size() >= 2) {
+            beChanged = false;
+            for (keel::usize i = 0; i < terms.size() && !beChanged; ++i) {
                 Expr cI, nI, xI;
                 keel::StringRef fnI;
                 if (!matchBEPoly(terms[i], cI, fnI, nI, xI))
@@ -810,7 +810,7 @@ Expr simplifyAddNode(Ctx &c, Expr e)
                             cI, nI,
                             c.pow(xJ, c.add({nI, c.number(keel::i64{-1})}))});
                         terms.remove_at(j);
-                        changed = true;
+                        beChanged = true;
                         break;
                     }
                     if (fnI == "eulerE" &&
@@ -819,7 +819,7 @@ Expr simplifyAddNode(Ctx &c, Expr e)
                         terms[i] =
                             c.mul({c.number(keel::i64{2}), cI, c.pow(xJ, nI)});
                         terms.remove_at(j);
-                        changed = true;
+                        beChanged = true;
                         break;
                     }
                 }
@@ -915,10 +915,10 @@ Expr simplifyAddNode(Ctx &c, Expr e)
             return true;
         };
 
-        bool changed = true;
-        while (changed && terms.size() >= 2) {
-            changed = false;
-            for (keel::usize i = 0; i < terms.size() && !changed; ++i) {
+        bool igChanged = true;
+        while (igChanged && terms.size() >= 2) {
+            igChanged = false;
+            for (keel::usize i = 0; i < terms.size() && !igChanged; ++i) {
                 Expr cI, sI, xI;
                 keel::StringRef fnI;
                 if (!matchIncGamma(terms[i], cI, fnI, sI, xI))
@@ -938,7 +938,7 @@ Expr simplifyAddNode(Ctx &c, Expr e)
                         terms[i] = c.mul(
                             {cI, simplifyFuncNode(c, c.func("gamma", sI))});
                         terms.remove_at(j);
-                        changed = true;
+                        igChanged = true;
                         break;
                     }
                     // Recurrence: f(s + 1, x) - s * f(s, x) -> +/- x^s * exp(-x)
@@ -954,7 +954,7 @@ Expr simplifyAddNode(Ctx &c, Expr e)
                             terms[i] =
                                 (fnI == "igamma") ? tail : c.neg(tail);
                             terms.remove_at(j);
-                            changed = true;
+                            igChanged = true;
                             break;
                         }
                     }
@@ -1539,20 +1539,20 @@ Expr simplifyFuncNode(Ctx &c, Expr e)
 
             // Half-integer multiples of pi: phi = (k/2)*pi -> k * ellipticK(m) / ellipticE(m)
             const Expr piSym = c.symbol("pi");
-            Rational kPi;
+            Rational piMul;
             bool isRatPi = false;
             if (nArg == piSym) {
-                kPi = Rational(keel::i64{1});
+                piMul = Rational(keel::i64{1});
                 isRatPi = true;
             } else if (c.kind(nArg) == NodeKind::Mul &&
                        c.childCount(nArg) == 2 &&
                        c.kind(c.child(nArg, 0)) == NodeKind::Number &&
                        c.child(nArg, 1) == piSym) {
-                kPi = c.numberValue(c.child(nArg, 0));
+                piMul = c.numberValue(c.child(nArg, 0));
                 isRatPi = true;
             }
             if (isRatPi) {
-                const Rational twoK = kPi * Rational(keel::i64{2});
+                const Rational twoK = piMul * Rational(keel::i64{2});
                 if (twoK.den() == BigInt(1)) {
                     const keel::StringRef compFn =
                         (fn == "ellipticF") ? "ellipticK" : "ellipticE";
@@ -2080,19 +2080,19 @@ Expr simplifyFuncNode(Ctx &c, Expr e)
     if (fn == "sin" || fn == "cos" || fn == "tan" || fn == "cot" ||
         fn == "sec" || fn == "csc") {
         const Expr piSym = c.symbol("pi");
-        Rational kPi;
+        Rational piMul;
         bool isRatPi = false;
         if (arg == piSym) {
-            kPi = Rational(keel::i64{1});
+            piMul = Rational(keel::i64{1});
             isRatPi = true;
         } else if (c.kind(arg) == NodeKind::Mul && c.childCount(arg) == 2 &&
                    c.kind(c.child(arg, 0)) == NodeKind::Number &&
                    c.child(arg, 1) == piSym) {
-            kPi = c.numberValue(c.child(arg, 0));
+            piMul = c.numberValue(c.child(arg, 0));
             isRatPi = true;
         }
         keel::i64 p = 0, q = 0;
-        if (isRatPi && kPi.num().fitsInt64(p) && kPi.den().fitsInt64(q) &&
+        if (isRatPi && piMul.num().fitsInt64(p) && piMul.den().fitsInt64(q) &&
             (q == 1 || q == 2 || q == 3 || q == 4 || q == 6)) {
             const keel::i64 twoQ = 2 * q;
             const keel::i64 m = ((p % twoQ) + twoQ) % twoQ;

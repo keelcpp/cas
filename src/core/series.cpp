@@ -2331,7 +2331,6 @@ keel::Array<Rational> bernoulliNumbers(keel::i32 maxN)
 //   zeta(2*m) = (-1)^(m-1) * 2^(2*m - 1) * B_{2m} / (2*m)! * pi^(2*m).
 Expr eulerZetaEven(Ctx &c, keel::i32 twoM)
 {
-    const keel::i32 m = twoM / 2;
     const keel::Array<Rational> B = bernoulliNumbers(twoM);
     Rational bVal = B[keel::as<keel::usize>(twoM)];
     if (bVal.signum() < 0)
@@ -3602,7 +3601,7 @@ SymSumResult symsum(Ctx &c, Expr f, Expr var, Expr a, Expr b, Budget *budget)
 
 namespace {
 
-Expr normalizeSeriesCoeff(Ctx &c, Expr e, Budget *budget)
+Expr normalizeSeriesCoeff(Ctx &c, Expr e, Budget * /*budget*/)
 {
     if (e.isNull())
         return c.zero();

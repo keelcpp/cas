@@ -20,6 +20,8 @@ const Rational R1()
 
 void ModCPoly::checkSameRing(const ModCPoly &a, const ModCPoly &b)
 {
+    (void)a;
+    (void)b;
     KEEL_CAS_ASSERT((!a.hasRing() || !b.hasRing() || a.ring_ == b.ring_) &&
            "ModCPoly operands from different rings");
 }
