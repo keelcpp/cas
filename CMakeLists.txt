@@ -41,7 +41,7 @@ if(NOT TARGET keel::bignum)
     FetchContent_Declare(
         keel_bignum
         GIT_REPOSITORY https://github.com/keelcpp/bignum.git
-        GIT_TAG        f773bfd14f29ac523f60cf2b6001400026a10d5a
+        GIT_TAG        a5ea8f672c193877fde046f8538499920d511560
     )
     FetchContent_MakeAvailable(keel_bignum)
 endif()
