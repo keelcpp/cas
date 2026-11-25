@@ -152,6 +152,14 @@ if(KEEL_CAS_BUILD_TESTS)
     else()
         target_compile_options(test_cas PRIVATE -Wall -Wextra -Wpedantic)
     endif()
+    if(COMMAND keel_enforce_guidelines)
+        keel_enforce_guidelines(test_cas
+            SCOPE ALL
+            BAN_RAW_INTS ALL
+            BAN_RAW_FLOATS ALL
+            WARNINGS OFF
+        )
+    endif()
     add_test(NAME test_cas COMMAND test_cas)
 
     if(NOT KEEL_CAS_NO_EXCEPTIONS_RTTI)

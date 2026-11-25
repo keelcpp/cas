@@ -1,6 +1,5 @@
 #include "keel/cas.h"
-
-#include <cstdio>
+#include "keel/format.h"
 
 namespace {
 
@@ -8,7 +7,7 @@ keel::i32 g_failed = 0;
 
 void check(bool cond, const char* expr, keel::i32 line) {
     if (!cond) {
-        std::fprintf(stderr, "FAIL [line %d]: %s\n", keel::as<int>(line), expr);
+        keel::eprintln("FAIL [line {}]: {}", line, expr);
         ++g_failed;
     }
 }
@@ -82,9 +81,9 @@ int main() {
     test_ode_and_laplace();
 
     if (g_failed != 0) {
-        std::fprintf(stderr, "test_cas: %d failure(s)\n", keel::as<int>(g_failed));
+        keel::eprintln("test_cas: {} failure(s)", g_failed);
         return 1;
     }
-    std::printf("test_cas: all tests passed\n");
+    keel::println("test_cas: all tests passed");
     return 0;
 }
