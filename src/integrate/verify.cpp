@@ -56,10 +56,16 @@ RIval iPowInt(const RIval &a, keel::i64 n)
 {
     if (n == 0)
         return {Rational(keel::i64{1}), Rational(keel::i64{1})};
-    RIval r = a;
-    const keel::i64 mag = n < 0 ? -n : n;
-    for (keel::i64 i = 1; i < mag; ++i)
-        r = iMul(r, a);
+    keel::u64 mag = n < 0 ? keel::as<keel::u64>(-(n + 1)) + 1 : keel::as<keel::u64>(n);
+    RIval r{Rational(keel::i64{1}), Rational(keel::i64{1})};
+    RIval base = a;
+    while (mag > 0) {
+        if (mag & 1u)
+            r = iMul(r, base);
+        mag >>= 1;
+        if (mag > 0)
+            base = iMul(base, base);
+    }
     if (n > 0)
         return r;
     return iDiv({Rational(keel::i64{1}), Rational(keel::i64{1})}, r);
@@ -182,13 +188,16 @@ bool evalIval(const Ctx &c, Expr e, Expr var, const Rational &x0,
         const Rational &v = c.numberValue(c.child(e, 1));
         keel::i64 p = 0;
         if (v.den() == BigInt(1) && v.num().fitsInt64(p)) {
+            if (p < -64 || p > 64)
+                return false;
             if (p < 0 && containsZero(base))
                 return false;
             out = iPowInt(base, p);
             return true;
         }
         keel::i64 q = 0;
-        if (!v.den().fitsInt64(q) || q <= 0 || !v.num().fitsInt64(p))
+        if (!v.den().fitsInt64(q) || q <= 0 || q > 16 ||
+            !v.num().fitsInt64(p) || p < -64 || p > 64)
             return false;
         if (base.lo < Rational(keel::i64{0}) ||
             (base.lo == Rational(keel::i64{0}) && p < 0))

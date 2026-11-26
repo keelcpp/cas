@@ -1558,6 +1558,8 @@ bool computeLaurent(Ctx &c, Expr e, Expr var, Expr x0, keel::i32 maxDeg,
             }
             return false;
         }
+        if (c.childCount(e) != 1)
+            return false;
         Laurent argSeries;
         if (!computeLaurent(c, c.child(e, 0), var, x0, maxDeg, budget, argSeries,
                             positiveT))
@@ -1604,6 +1606,8 @@ Expr taylorByDiffFallback(Ctx &c, Expr f, Expr var, Expr x0, keel::i32 order,
             return Expr();
         if (k > 0) {
             cur = c.diff(cur, var);
+            if (cur.isNull())
+                return Expr();
             fact = fact * BigInt(k);
         }
         const Expr atX0 = safeSubsAndFold(c, cur, var, x0);
@@ -1696,7 +1700,8 @@ Expr combineLogsForLimit(Ctx &c, Expr e)
         keel::Array<Expr> otherTerms;
         keel::Array<keel::Pair<Rational, Expr>> logTerms;
         auto matchRatLog = [&](Expr t, Rational &rOut, Expr &uOut) -> bool {
-            if (c.kind(t) == NodeKind::Func && c.funcName(t) == "log") {
+            if (c.kind(t) == NodeKind::Func && c.childCount(t) == 1 &&
+                c.funcName(t) == "log") {
                 rOut = Rational(keel::i64{1});
                 uOut = c.child(t, 0);
                 return true;
@@ -1704,6 +1709,7 @@ Expr combineLogsForLimit(Ctx &c, Expr e)
             if (c.kind(t) == NodeKind::Mul && c.childCount(t) == 2 &&
                 c.kind(c.child(t, 0)) == NodeKind::Number &&
                 c.kind(c.child(t, 1)) == NodeKind::Func &&
+                c.childCount(c.child(t, 1)) == 1 &&
                 c.funcName(c.child(t, 1)) == "log") {
                 rOut = c.numberValue(c.child(t, 0));
                 uOut = c.child(c.child(t, 1), 0);
@@ -1728,15 +1734,26 @@ Expr combineLogsForLimit(Ctx &c, Expr e)
             }
             keel::Array<Expr> prodFactors;
             prodFactors.reserve(logTerms.size());
+            bool canCombine = true;
             for (const auto &kv : logTerms) {
                 const BigInt m = kv.first.num() * (qLcm / kv.first.den());
+                if (m.signum() < 0 && c.isZero(kv.second)) {
+                    canCombine = false;
+                    break;
+                }
                 prodFactors.push_back(
                     c.pow(kv.second, c.number(Rational(m, BigInt(1)))));
             }
-            const Expr combinedLog = c.mul(
-                {c.number(Rational(BigInt(1), qLcm)),
-                 c.func("log", c.mul(prodFactors))});
-            otherTerms.push_back(combinedLog);
+            if (canCombine) {
+                const Expr combinedLog = c.mul(
+                    {c.number(Rational(BigInt(1), qLcm)),
+                     c.func("log", c.mul(prodFactors))});
+                otherTerms.push_back(combinedLog);
+            } else {
+                for (const auto &kv : logTerms)
+                    otherTerms.push_back(
+                        c.mul({c.number(kv.first), c.func("log", kv.second)}));
+            }
         } else {
             for (const auto &kv : logTerms)
                 otherTerms.push_back(
@@ -1838,7 +1855,7 @@ LimitResult limitDepth(Ctx &c, Expr f, Expr var, Expr x0, Budget *budget,
             return out;
         }
     }
-    if (c.kind(f) == NodeKind::Func) {
+    if (c.kind(f) == NodeKind::Func && c.childCount(f) == 1) {
         const keel::String &fn = c.funcName(f);
         const Expr arg = c.child(f, 0);
         if (fn == "log" || fn == "Ei" || fn == "Ci") {
@@ -1923,12 +1940,14 @@ LimitResult limitDepth(Ctx &c, Expr f, Expr var, Expr x0, Budget *budget,
                 c.numberValue(c.child(ch, 1)).signum() < 0) {
                 denFactors.push_back(
                     c.pow(c.child(ch, 0), c.number(-c.numberValue(c.child(ch, 1)))));
-            } else if (c.kind(ch) == NodeKind::Func && c.funcName(ch) == "log" &&
+            } else if (c.kind(ch) == NodeKind::Func &&
+                       c.childCount(ch) == 1 && c.funcName(ch) == "log" &&
                        safeSubsAndFold(c, ch, var, x0).isNull()) {
                 logFactors.push_back(ch);
                 logExps.push_back(1);
             } else if (c.kind(ch) == NodeKind::Pow &&
                        c.kind(c.child(ch, 0)) == NodeKind::Func &&
+                       c.childCount(c.child(ch, 0)) == 1 &&
                        c.funcName(c.child(ch, 0)) == "log" &&
                        c.kind(c.child(ch, 1)) == NodeKind::Number &&
                        safeSubsAndFold(c, c.child(ch, 0), var, x0).isNull()) {
@@ -1955,7 +1974,7 @@ LimitResult limitDepth(Ctx &c, Expr f, Expr var, Expr x0, Budget *budget,
             if (!aAt0.isNull() && isZeroCoeff(c, aAt0)) {
                 const Expr dA = c.diff(A, var);
                 const Expr dB = c.diff(B, var);
-                if (!c.isZero(dA)) {
+                if (!dA.isNull() && !dB.isNull() && !c.isZero(dA)) {
                     const Expr logPowM1 =
                         (kExp == 1)
                             ? c.one()
@@ -1995,7 +2014,7 @@ LimitResult limitDepth(Ctx &c, Expr f, Expr var, Expr x0, Budget *budget,
             }
             const Expr dN = c.diff(N, var);
             const Expr dD = c.diff(D, var);
-            if (!c.isZero(dD)) {
+            if (!dN.isNull() && !dD.isNull() && !c.isZero(dD)) {
                 return limitDepth(c, c.div(dN, dD), var, x0, budget, depth + 1,
                                   positiveT);
             }
@@ -2274,8 +2293,10 @@ Expr residue(Ctx &c, Expr f, Expr var, Expr z0, Budget *budget)
         const Expr gm = c.simplify(
             c.mul({c.pow(dz, c.number(keel::as<keel::i64>(m))), f}));
         Expr deriv = gm;
-        for (keel::i32 k = 1; k < m; ++k)
+        for (keel::i32 k = 1; k < m && !deriv.isNull(); ++k)
             deriv = c.diff(deriv, var);
+        if (deriv.isNull())
+            continue;
         const LimitResult lr = limit(c, deriv, var, z0, budget);
         if (lr.proved()) {
             return c.simplify(
@@ -3289,9 +3310,9 @@ SymSumResult symsum(Ctx &c, Expr f, Expr var, Expr a, Expr b, Budget *budget)
                             }
                         }
                         const keel::i32 p = keel::as<keel::i32>(irs.size());
-                        const Rational scale =
-                            rN.coeff(0) /
-                            Rational::powUInt(lcD, keel::as<keel::u64>(p));
+                        // rD = lcD * dMon = lcD * (k - rt)^p, so lcD is already
+                        // the full denominator scale factor (not raised to p).
+                        const Rational scale = rN.coeff(0) / lcD;
                         if (sameRoot && rt.den() == BigInt(1)) {
                             keel::i64 rtInt = 0;
                             if (rt.num().fitsInt64(rtInt) && a0 - rtInt >= 1 &&

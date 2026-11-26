@@ -1468,7 +1468,7 @@ void factorArbitraryMPolyRec(const MPoly &P, keel::i32 mult, keel::usize kVars,
             if (!common.isZero() && !mpolyIsConstant(common)) {
                 mpolyDivExact(rad, common, order, mult1Part);
                 mpolyDivExact(gSq, common, order, higherPart);
-                factorArbitraryMPolyRec(common, mult + 1, kVars, order, budget,
+                factorArbitraryMPolyRec(common, 2 * mult, kVars, order, budget,
                                         factorsOut);
                 if (!mpolyIsConstant(higherPart)) {
                     factorArbitraryMPolyRec(higherPart, mult, kVars, order,

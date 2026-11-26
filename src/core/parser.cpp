@@ -166,17 +166,28 @@ private:
 
     Expr parseExpr(keel::i32 minBp)
     {
+        static constexpr keel::i32 kMaxParseDepth = 256;
+        if (depth_ >= kMaxParseDepth) {
+            fail(cur_.pos, "maximum expression nesting depth exceeded");
+            return {};
+        }
+        ++depth_;
         Expr left = nud();
         while (!failed_) {
             const keel::i32 b = bp(cur_.kind);
             if (b <= minBp)
                 break;
             const Tok op = cur_.kind;
+            const keel::usize opPos = cur_.pos;
             advance();
             Expr right = parseExpr(op == Tok::Caret ? b - 1 : b);
-            if (failed_) return {};
-            left = apply(op, left, right);
+            if (failed_) {
+                --depth_;
+                return {};
+            }
+            left = apply(op, opPos, left, right);
         }
+        --depth_;
         return left;
     }
 
@@ -212,16 +223,35 @@ private:
         }
     }
 
-    Expr apply(Tok op, Expr a, Expr b)
+    Expr apply(Tok op, keel::usize opPos, Expr a, Expr b)
     {
+        Expr res;
         switch (op) {
-        case Tok::Plus: return c_.add({a, b});
-        case Tok::Minus: return c_.add({a, c_.neg(b)});
-        case Tok::Star: return c_.mul({a, b});
-        case Tok::Slash: return c_.div(a, b);
-        case Tok::Caret: return c_.pow(a, b);
+        case Tok::Plus: res = c_.add({a, b}); break;
+        case Tok::Minus: res = c_.add({a, c_.neg(b)}); break;
+        case Tok::Star: res = c_.mul({a, b}); break;
+        case Tok::Slash:
+            if (c_.isZero(b)) {
+                fail(opPos, "division by zero");
+                return {};
+            }
+            res = c_.div(a, b);
+            break;
+        case Tok::Caret:
+            if (c_.isZero(a) && c_.kind(b) == NodeKind::Number &&
+                c_.numberValue(b).signum() < 0) {
+                fail(opPos, "zero raised to negative power");
+                return {};
+            }
+            res = c_.pow(a, b);
+            break;
         default: KEEL_CAS_ASSERT(false && "not a binary token"); return {};
         }
+        if (res.isNull()) {
+            fail(opPos, "invalid operation");
+            return {};
+        }
+        return res;
     }
 
     Expr numberLiteral()
@@ -235,6 +265,10 @@ private:
         }
         if (t.frac.empty())
             return c_.number(Rational(keel::move(ipart), BigInt(1)));
+        if (t.frac.size() > 64) {
+            fail(t.pos, "decimal fraction too long");
+            return {};
+        }
         BigInt frac;
         if (!BigInt::tryParse(frac, t.frac)) {
             fail(t.pos, keel::format("malformed number '0.{}'", t.frac));
@@ -285,6 +319,7 @@ private:
     Ctx &c_;
     keel::StringRef src_;
     keel::usize pos_ = 0;
+    keel::i32 depth_ = 0;
     Token cur_;
     bool failed_ = false;
     ParseErrorInfo err_;

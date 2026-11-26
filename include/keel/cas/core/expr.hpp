@@ -167,7 +167,8 @@ public:
     // True iff e is the canonical zero Number node.
     bool isZero(Expr e) const
     {
-        return kind(e) == NodeKind::Number && numberValue(e).isZero();
+        return !e.isNull() && kind(e) == NodeKind::Number &&
+               numberValue(e).isZero();
     }
 
     // Symbolic derivative d/de of e. var must be a Symbol node.

@@ -66,7 +66,9 @@ keel::usize countRealRoots(keel::ArrayRef<UPoly> sturm,
 {
     KEEL_CAS_ASSERT(!sturm.empty());
     KEEL_CAS_ASSERT(a < b);
-    return variations(sturm, a) - variations(sturm, b);
+    const keel::usize va = variations(sturm, a);
+    const keel::usize vb = variations(sturm, b);
+    return va >= vb ? va - vb : 0;
 }
 
 keel::Array<RootInterval> isolateRealRoots(const UPoly &p0)
@@ -124,15 +126,18 @@ keel::Array<RootInterval> isolateRealRoots(const UPoly &p0)
 RootInterval refineRoot(const UPoly &p, RootInterval iv,
                         const Rational &targetWidth)
 {
-    if (iv.exact())
+    if (iv.exact() || targetWidth.signum() <= 0 || p.isZero() || p.deg() < 1)
         return iv;
     // Endpoints of an isolated interval may themselves be recorded exact
     // roots; the (a, b] Sturm count excludes a, so half selection by
     // counting stays correct with root endpoints.
-    const keel::Array<UPoly> sturm = sturmSequence(p);
-    while (iv.hi - iv.lo > targetWidth) {
+    const UPoly psf = p.squarefreePart();
+    if (psf.deg() < 1)
+        return iv;
+    const keel::Array<UPoly> sturm = sturmSequence(psf);
+    for (keel::i32 iter = 0; iter < 4096 && iv.hi - iv.lo > targetWidth; ++iter) {
         const Rational mid = (iv.lo + iv.hi) * Rational(keel::i64{1}, BigInt(2));
-        if (p.eval(mid).isZero())
+        if (psf.eval(mid).isZero())
             return RootInterval{mid, mid};
         if (countRealRoots(sturm, iv.lo, mid) > 0)
             iv.hi = mid;

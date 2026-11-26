@@ -20,14 +20,6 @@ keel::u32 mix32(keel::u32 h, keel::u32 v)
     return (h ^ v) * kFnvPrime;
 }
 
-keel::u32 hashName(keel::StringRef s)
-{
-    keel::u32 h = kFnvOffset;
-    for (char c : s)
-        h = mix32(h, keel::as<keel::u8>(c));
-    return h;
-}
-
 keel::i32 signOf(keel::i32 c)
 {
     return c < 0 ? -1 : (c > 0 ? 1 : 0);
@@ -1102,6 +1094,8 @@ bool Ctx::evalExact(
                 return evalPolylogNegIntExact(-n, xVal, out);
             return false;
         }
+        if (childCount(e) != 1)
+            return false;
         Rational a;
         if (!evalExact(child(e, 0), vals, a))
             return false;
@@ -1215,12 +1209,26 @@ bool Ctx::evalExact(
         keel::i64 k = 0;
         if (!(ex.den() == BigInt(1)) || !ex.num().fitsInt64(k))
             return false; // fractional or huge exponent: irrational
+        if (base.isZero()) {
+            if (k < 0)
+                return false; // 0^negative
+            out = (k == 0) ? Rational(keel::i64{1}) : Rational(keel::i64{0});
+            return true;
+        }
+        if (base == Rational(keel::i64{1})) {
+            out = base;
+            return true;
+        }
+        if (base == Rational(keel::i64{-1})) {
+            out = ((k & 1) == 0) ? Rational(keel::i64{1}) : Rational(keel::i64{-1});
+            return true;
+        }
+        if (k < -4096 || k > 4096)
+            return false;
         if (k >= 0) {
             out = Rational::powUInt(base, keel::as<keel::u64>(k));
             return true;
         }
-        if (base.isZero())
-            return false; // 0^negative
         out = Rational(BigInt(1), BigInt(1)) /
               Rational::powUInt(base, keel::as<keel::u64>(-k));
         return true;
@@ -1632,7 +1640,7 @@ bool evalTrigammaDouble(keel::f64 x, keel::f64 &out)
 
 bool evalBesselJDouble(keel::f64 nu, keel::f64 x, keel::f64 &out)
 {
-    if (!keel::is_finite(nu) || !keel::is_finite(x))
+    if (!keel::is_finite(nu) || !keel::is_finite(x) || keel::abs(nu) > 1e6)
         return false;
     const bool isIntNu = (keel::floor(nu) == nu);
     if (x == 0.0) {
@@ -1747,6 +1755,8 @@ bool evalBesselYDouble(keel::f64 nu, keel::f64 x, keel::f64 &out)
         out = (jPos * keel::cos(nu * kPiDouble) - jNeg) / keel::sin(nu * kPiDouble);
         return keel::is_finite(out);
     }
+    if (keel::abs(nu) > 30.0)
+        return false;
     keel::f64 signFactor = 1.0;
     keel::i32 n = keel::as<keel::i32>(nu);
     if (n < 0) {
@@ -1790,7 +1800,7 @@ bool evalBesselYDouble(keel::f64 nu, keel::f64 x, keel::f64 &out)
 
 bool evalBesselIDouble(keel::f64 nu, keel::f64 x, keel::f64 &out)
 {
-    if (!keel::is_finite(nu) || !keel::is_finite(x))
+    if (!keel::is_finite(nu) || !keel::is_finite(x) || keel::abs(nu) > 1e6)
         return false;
     const bool isIntNu = (keel::floor(nu) == nu);
     if (x == 0.0) {
@@ -1882,6 +1892,8 @@ bool evalBesselKDouble(keel::f64 nu, keel::f64 x, keel::f64 &out)
         out = (0.5 * kPiDouble) * (iNeg - iPos) / keel::sin(nu * kPiDouble);
         return keel::is_finite(out);
     }
+    if (nu > 30.0)
+        return false;
     const keel::i32 n = keel::as<keel::i32>(nu);
     if (n > 30)
         return false;
@@ -1925,6 +1937,19 @@ bool evalAiryDouble(keel::StringRef fn, keel::f64 x, keel::f64 &out)
     static constexpr keel::f64 kAi0 = 0.35502805388781723926;
     static constexpr keel::f64 kAiP0 = 0.25881940379280679840;
     const keel::f64 sqrt3 = keel::sqrt(3.0);
+    if (x == 0.0) {
+        if (fn == "airyAi")
+            out = kAi0;
+        else if (fn == "airyBi")
+            out = sqrt3 * kAi0;
+        else if (fn == "airyAiPrime")
+            out = -kAiP0;
+        else if (fn == "airyBiPrime")
+            out = sqrt3 * kAiP0;
+        else
+            return false;
+        return true;
+    }
     if (keel::abs(x) <= 5.5) {
         const keel::f64 x2 = x * x;
         const keel::f64 x3 = x2 * x;
@@ -2015,7 +2040,8 @@ bool evalAiryDouble(keel::StringRef fn, keel::f64 x, keel::f64 &out)
 bool evalOrthogonalPolyDouble(keel::StringRef fn, keel::f64 nVal, keel::f64 x,
                               keel::f64 &out)
 {
-    if (!keel::is_finite(nVal) || !keel::is_finite(x) || keel::floor(nVal) != nVal)
+    if (!keel::is_finite(nVal) || !keel::is_finite(x) ||
+        keel::floor(nVal) != nVal || nVal < -1000.0 || nVal > 1000.0)
         return false;
     keel::i32 n = keel::as<keel::i32>(nVal);
     if (fn == "legendreP") {
@@ -2349,7 +2375,7 @@ bool evalZetaDouble(keel::f64 s, keel::f64 &out)
         out = -0.5;
         return true;
     }
-    if (s < 0.0 && keel::floor(s) == s) {
+    if (s < 0.0 && s >= -1e15 && keel::floor(s) == s) {
         const keel::i64 m = keel::as<keel::i64>(-s);
         if (m % 2 == 0) {
             out = 0.0;
@@ -2443,7 +2469,7 @@ bool evalPolylogDouble(keel::f64 s, keel::f64 z, keel::f64 &out)
         out = -eta;
         return keel::is_finite(out);
     }
-    if (s <= 0.0 && keel::floor(s) == s) {
+    if (s <= 0.0 && s >= -20.0 && keel::floor(s) == s) {
         const keel::i64 m = keel::as<keel::i64>(-s);
         if (m == 0) {
             out = z / (1.0 - z);
@@ -2502,11 +2528,10 @@ bool evalPolylogDouble(keel::f64 s, keel::f64 z, keel::f64 &out)
 bool evalBernoulliEuler2ArgDouble(keel::StringRef fn, keel::f64 nVal, keel::f64 x,
                                   keel::f64 &out)
 {
-    if (!keel::is_finite(nVal) || !keel::is_finite(x) || keel::floor(nVal) != nVal)
+    if (!keel::is_finite(nVal) || !keel::is_finite(x) ||
+        keel::floor(nVal) != nVal || nVal < 0.0 || nVal > 40.0)
         return false;
     const keel::i64 n = keel::as<keel::i64>(nVal);
-    if (n < 0 || n > 40)
-        return false;
     if (fn == "bernoulliB") {
         keel::f64 sum = 0.0;
         keel::f64 binom = 1.0;
@@ -2677,7 +2702,7 @@ bool evalHypergeom1F1Double(keel::f64 a, keel::f64 b, keel::f64 z, keel::f64 &ou
         out = 1.0;
         return true;
     }
-    const bool aNegInt = (a <= 0.0 && keel::floor(a) == a);
+    const bool aNegInt = (a <= 0.0 && a >= -200.0 && keel::floor(a) == a);
     if (b <= 0.0 && keel::floor(b) == b) {
         if (!aNegInt || b < a)
             return false;
@@ -2931,7 +2956,7 @@ bool evalDoubleRec(
                 if (!evalHypergeom0F1Double(a0, a1, res)) return false;
             } else if (fn == "stirlingS1" || fn == "stirlingS2") {
                 if (keel::floor(a0) != a0 || keel::floor(a1) != a1 ||
-                    a0 < 0.0 || a0 > 50.0)
+                    a0 < 0.0 || a0 > 50.0 || a1 < -100.0 || a1 > 100.0)
                     return false;
                 const auto nInt = keel::as<keel::i64>(a0);
                 const auto kInt = keel::as<keel::i64>(a1);
@@ -2969,6 +2994,8 @@ bool evalDoubleRec(
                 return false;
             break;
         }
+        if (c.childCount(e) != 1)
+            return false;
         keel::f64 a = 0.0;
         if (!evalDoubleRec(c, c.child(e, 0), vals, memo, a))
             return false;
@@ -3013,9 +3040,10 @@ bool evalDoubleRec(
         } else if (fn == "atan") {
             res = keel::atan(a);
         } else if (fn == "acot") {
-            res = (a >= 0.0) ? keel::atan(1.0 / a)
-                             : (keel::kPi +
-                                keel::atan(1.0 / a));
+            res = (a == 0.0)
+                      ? (0.5 * kPiDouble)
+                      : ((a > 0.0) ? keel::atan(1.0 / a)
+                                   : (keel::kPi + keel::atan(1.0 / a)));
         } else if (fn == "asec") {
             if (a > -1.0 && a < 1.0) return false;
             res = keel::acos(1.0 / a);
@@ -3103,7 +3131,7 @@ bool evalDoubleRec(
         } else if (fn == "dirichletEta") {
             if (!evalDirichletEtaDouble(a, res)) return false;
         } else if (fn == "bernoulliB" || fn == "eulerE") {
-            if (keel::floor(a) != a) return false;
+            if (keel::floor(a) != a || a < 0.0 || a > 60.0) return false;
             Rational rVal;
             const keel::i64 nInt = keel::as<keel::i64>(a);
             if (!(fn == "bernoulliB" ? bernoulliExact(nInt, rVal)
@@ -3166,6 +3194,8 @@ void pushSumTerms(const Ctx &c, Expr e, keel::Array<Expr> &out)
 
 Expr Ctx::expand(Expr e)
 {
+    if (e.isNull())
+        return Expr();
     switch (kind(e)) {
     case NodeKind::Number:
     case NodeKind::Symbol:
@@ -3457,13 +3487,15 @@ Expr Ctx::expand(Expr e)
         // (sum)^k with k >= 2: distribute by iterated multiplication;
         // k <= 1 canonicalizes away already. Negative k distributes
         // multiplicatively over the base factors instead.
-        if (k <= 1)
+        if (k <= 1 || kind(base) != NodeKind::Add || k > 64)
             return pow(base, exp);
+        static constexpr keel::usize kMaxExpandTerms = 4096;
         keel::Array<Expr> terms{one()};
         keel::Array<Expr> factors;
-        for (keel::i32 i = 0; i < k; ++i) {
-            factors.clear();
-            pushSumTerms(*this, base, factors);
+        pushSumTerms(*this, base, factors);
+        for (keel::i64 i = 0; i < k; ++i) {
+            if (terms.size() * factors.size() > kMaxExpandTerms * 4)
+                return pow(base, exp);
             keel::Array<Expr> next;
             next.reserve(terms.size() * factors.size());
             for (const Expr &t : terms) {
@@ -3484,7 +3516,11 @@ Expr Ctx::expand(Expr e)
                         next.push_back(prod);
                 }
             }
-            terms = keel::move(next);
+            const Expr stepSum = add(next);
+            terms.clear();
+            pushSumTerms(*this, stepSum, terms);
+            if (terms.size() > kMaxExpandTerms)
+                return pow(base, exp);
         }
         return add(terms);
     }
@@ -3496,10 +3532,13 @@ Expr Ctx::expand(Expr e)
     }
     case NodeKind::Mul: {
         // Multiply out the sum-views of the expanded factors.
+        static constexpr keel::usize kMaxExpandTerms = 4096;
         keel::Array<Expr> terms{one()};
         for (keel::usize i = 0; i < childCount(e); ++i) {
             keel::Array<Expr> factors;
             pushSumTerms(*this, expand(child(e, i)), factors);
+            if (terms.size() * factors.size() > kMaxExpandTerms * 4)
+                return e;
             keel::Array<Expr> next;
             next.reserve(terms.size() * factors.size());
             for (const Expr &t : terms) {
@@ -3520,7 +3559,11 @@ Expr Ctx::expand(Expr e)
                         next.push_back(prod);
                 }
             }
-            terms = keel::move(next);
+            const Expr stepSum = add(next);
+            terms.clear();
+            pushSumTerms(*this, stepSum, terms);
+            if (terms.size() > kMaxExpandTerms)
+                return e;
         }
         return add(terms);
     }
@@ -3530,6 +3573,8 @@ Expr Ctx::expand(Expr e)
 
 Expr Ctx::subs(Expr e, Expr from, Expr to)
 {
+    if (e.isNull())
+        return Expr();
     if (e == from)
         return to;
     switch (kind(e)) {
@@ -3735,6 +3780,8 @@ bool Ctx::isAssumedPositive(Expr e) const
         return false;
     }
     case NodeKind::Func: {
+        if (childCount(e) != 1)
+            return false;
         const keel::String &fn = funcName(e);
         const Expr u = child(e, 0);
         if (fn == "exp" || fn == "cosh" || fn == "sech" || fn == "erfc")
@@ -3802,6 +3849,8 @@ bool Ctx::isAssumedNegative(Expr e) const
         return false;
     }
     case NodeKind::Func: {
+        if (childCount(e) != 1)
+            return false;
         const keel::String &fn = funcName(e);
         const Expr u = child(e, 0);
         if (fn == "sinh" || fn == "tanh" || fn == "asinh" || fn == "atan" ||
@@ -3867,6 +3916,8 @@ bool Ctx::isAssumedNonNegative(Expr e) const
         return false;
     }
     case NodeKind::Func: {
+        if (childCount(e) != 1)
+            return false;
         const keel::String &fn = funcName(e);
         const Expr u = child(e, 0);
         if (fn == "abs")
@@ -3932,6 +3983,8 @@ bool Ctx::isAssumedReal(Expr e) const
         return false;
     }
     case NodeKind::Func: {
+        if (childCount(e) != 1)
+            return false;
         const keel::String &fn = funcName(e);
         const Expr u = child(e, 0);
         if (fn == "log" || fn == "Ci" || fn == "lgamma" || fn == "loggamma" ||

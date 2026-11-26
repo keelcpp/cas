@@ -171,9 +171,11 @@ bool hasPoleAt(Ctx &c, Expr e, Expr var, Expr root)
     case NodeKind::RootOf:
         return false;
     case NodeKind::Func: {
-        if (hasPoleAt(c, c.child(e, 0), var, root))
-            return true;
-        if (c.funcName(e) == "log") {
+        for (keel::usize i = 0; i < c.childCount(e); ++i) {
+            if (hasPoleAt(c, c.child(e, i), var, root))
+                return true;
+        }
+        if (c.funcName(e) == "log" && c.childCount(e) == 1) {
             const Expr subArg = c.subs(c.child(e, 0), var, root);
             if (isZeroAfterSimplify(c, subArg))
                 return true;
@@ -398,6 +400,8 @@ bool solveSingleOccurrence(Ctx &c, Expr lhs, Expr rhs, Expr var,
         return false;
     }
     case NodeKind::Func: {
+        if (c.childCount(lhs) != 1)
+            return false;
         const keel::String &fn = c.funcName(lhs);
         const Expr arg = c.child(lhs, 0);
         if (fn == "exp") {
@@ -527,6 +531,8 @@ void solvePolyCoeffs(Ctx &c, keel::ArrayRef<Expr> coeffsIn,
     }
     if (pureBinomial) {
         const Expr rhs = c.simplify(c.div(c.neg(coeffs[0]), coeffs[deg]));
+        if (rhs.isNull())
+            return;
         const Rational invD(keel::i64{1}, BigInt(keel::as<keel::i64>(deg)));
         if (deg % 2 == 0) {
             if (c.kind(rhs) == NodeKind::Number &&

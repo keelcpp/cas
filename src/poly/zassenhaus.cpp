@@ -313,30 +313,44 @@ factorPrimitiveInteger(keel::ArrayRef<BigInt> fIn, Budget *budget)
     if (f.size() == 2)
         return singletonPoly(keel::move(f));
 
-    // Prime search: p must not kill the leading coefficient and f must
-    // stay squarefree mod p.
-    const keel::u64 kPrimes[] = {3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43};
+    // Prime search: p must not kill the leading coefficient, f must
+    // stay squarefree mod p, and the modular factor count must stay
+    // below the 32-bit subset-enumeration cap.
+    auto isOddPrime = [](keel::u64 n) -> bool {
+        if (n < 3 || (n & 1u) == 0)
+            return false;
+        for (keel::u64 d = 3; d * d <= n; d += 2) {
+            if (n % d == 0)
+                return false;
+        }
+        return true;
+    };
     keel::u64 p = 0;
     FpPoly fFp;
+    keel::Array<FpPoly> gFp;
     const keel::i32 degF = keel::as<keel::i32>(f.size()) - 1;
-    for (keel::u64 cand : kPrimes) {
+    for (keel::u64 cand = 3; cand < 10000; cand += 2) {
+        if (!isOddPrime(cand))
+            continue;
         FpPoly fp = toFp(f, cand);
         if (fp.isZero() || fp.deg() != degF) // p must not divide the lc
             continue;
         if (FpPoly::gcd(fp, fp.derivative()).deg() != 0)
             continue;
+        keel::Array<FpPoly> trial = FpPoly::factor(fp);
+        if (trial.size() >= 32)
+            continue;
         p = cand;
-        fFp = fp;
+        fFp = keel::move(fp);
+        gFp = keel::move(trial);
         break;
     }
     if (p == 0)
         return singletonPoly(keel::move(f)); // no suitable small prime found: return whole
 
-    keel::Array<FpPoly> gFp = FpPoly::factor(fFp);
     const keel::usize r = gFp.size();
     if (r <= 1)
         return singletonPoly(keel::move(f)); // irreducible mod p => irreducible over Q
-    KEEL_CAS_ASSERT(r < 32 && "subset enumeration limit");
     // All gFp are MONIC: the lift runs against the monic associate of f
     // (absorbing lc mod p into a factor would freeze the product's
     // leading coefficient and break the congruence for k >= 3: the
@@ -453,7 +467,7 @@ factorPrimitiveInteger(keel::ArrayRef<BigInt> fIn, Budget *budget)
                             rep0 = rep0 + pk;
                         if (rep0 > halfConst)
                             rep0 = rep0 - pk;
-                        if (rep0.abs() > bound)
+                        if (rep0.isZero() || rep0.abs() > bound)
                             continue;
                         BigInt q0, r0;
                         BigInt::divMod(curConst, rep0, q0, r0);

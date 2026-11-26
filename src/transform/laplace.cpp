@@ -221,17 +221,24 @@ Expr rewriteHypToExp(Ctx &c, Expr e, Expr var)
         return e;
     case NodeKind::Func: {
         const keel::String &fn = c.funcName(e);
-        const Expr u = rewriteHypToExp(c, c.child(e, 0), var);
-        const Expr half = c.number(Rational(keel::i64{1}, BigInt(2)));
-        if (fn == "sinh") {
-            return c.mul(
-                {half, c.add({c.func("exp", u), c.neg(c.func("exp", c.neg(u)))})});
+        if (c.childCount(e) == 1) {
+            const Expr u = rewriteHypToExp(c, c.child(e, 0), var);
+            const Expr half = c.number(Rational(keel::i64{1}, BigInt(2)));
+            if (fn == "sinh") {
+                return c.mul(
+                    {half, c.add({c.func("exp", u), c.neg(c.func("exp", c.neg(u)))})});
+            }
+            if (fn == "cosh") {
+                return c.mul(
+                    {half, c.add({c.func("exp", u), c.func("exp", c.neg(u))})});
+            }
+            return c.func(fn, u);
         }
-        if (fn == "cosh") {
-            return c.mul(
-                {half, c.add({c.func("exp", u), c.func("exp", c.neg(u))})});
-        }
-        return c.func(fn, u);
+        keel::Array<Expr> args;
+        args.reserve(c.childCount(e));
+        for (keel::usize i = 0; i < c.childCount(e); ++i)
+            args.push_back(rewriteHypToExp(c, c.child(e, i), var));
+        return c.func(fn, args);
     }
     case NodeKind::Pow:
         return c.pow(rewriteHypToExp(c, c.child(e, 0), var),
@@ -515,7 +522,7 @@ LaplaceResult laplaceRec(Ctx &c, Expr f, Expr t, Expr s, Budget *budget,
     }
 
     // 5. Elementary Func of linear argument phi + w*t: exp, sin, cos, sinh, cosh, sqrt.
-    if (c.kind(f) == NodeKind::Func) {
+    if (c.kind(f) == NodeKind::Func && c.childCount(f) == 1) {
         const keel::String &fn = c.funcName(f);
         const Expr arg = c.child(f, 0);
         if (fn == "sqrt") {
@@ -1018,7 +1025,7 @@ bool tryParametricIlaplace(Ctx &c, Expr F, Expr s, Expr t, Budget *budget,
         const Rational &re = c.numberValue(c.child(F, 1));
         keel::i64 num2 = 0;
         if (re.den() == BigInt(2) && re.num().fitsInt64(num2) && num2 <= -1 &&
-            (-num2) % 2 == 1) {
+            num2 >= -65 && (-num2) % 2 == 1) {
             const keel::i64 k = (-num2 - 1) / 2;
             Expr c0, c1;
             if (extractLinearInVar(c, c.child(F, 0), s, c0, c1) &&

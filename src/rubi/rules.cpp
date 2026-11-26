@@ -519,7 +519,8 @@ Expr expandPolyTimesBinomialPow(Ctx &c, const UPoly &P, const UPoly &B,
         UPoly Q, R;
         UPoly::divMod(cur, B, Q, R);
         if (!R.isZero()) {
-            for (keel::usize i = 0; i <= R.deg(); ++i) {
+            const keel::usize rDeg = keel::as<keel::usize>(R.deg());
+            for (keel::usize i = 0; i <= rDeg; ++i) {
                 if (R.coeff(i).isZero())
                     continue;
                 Expr mono = c.number(R.coeff(i));
@@ -940,9 +941,12 @@ Expr buildReplacement(const RuleTables &t, const keel::i32 *terms, Ctx &c,
             UPoly N, D;
             if (!toRational(c, u, var, N, D) || !D.isConst() || D.isZero())
                 return Expr();
+            if (N.isZero())
+                return c.zero();
             const keel::usize ku = keel::as<keel::usize>(k);
-            keel::Array<Rational> coeffs(N.deg() / ku + 1, Rational(0));
-            for (keel::usize i = 0; i <= N.deg(); ++i) {
+            const keel::usize nDeg = keel::as<keel::usize>(N.deg());
+            keel::Array<Rational> coeffs(nDeg / ku + 1, Rational(0));
+            for (keel::usize i = 0; i <= nDeg; ++i) {
                 if (N.coeff(i).isZero())
                     continue;
                 if (i % ku != 0)
@@ -1471,7 +1475,8 @@ bool evalCondition(const RuleTables &t, const keel::i32 *terms, Ctx &c,
             N.deg() < 1)
             return false;
         const keel::usize su = keel::as<keel::usize>(step);
-        for (keel::usize i = 0; i <= N.deg(); ++i)
+        const keel::usize nDeg = keel::as<keel::usize>(N.deg());
+        for (keel::usize i = 0; i <= nDeg; ++i)
             if (!N.coeff(i).isZero() && (i % su != 0))
                 return false;
         if (nkids == 3) {
@@ -1482,7 +1487,7 @@ bool evalCondition(const RuleTables &t, const keel::i32 *terms, Ctx &c,
                 !(c.numberValue(dExpr).den() == BigInt(1)) ||
                 !c.numberValue(dExpr).num().fitsInt64(di) || di < 0)
                 return false;
-            return N.deg() == keel::as<keel::usize>(di * step);
+            return nDeg == keel::as<keel::usize>(di * step);
         }
         return true;
     }

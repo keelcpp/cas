@@ -146,7 +146,7 @@ bool splitComplexI(Ctx &c, Expr e, Expr &reOut, Expr &imOut)
         return true;
     }
     case NodeKind::Func: {
-        if (c.funcName(e) == "exp") {
+        if (c.funcName(e) == "exp" && c.childCount(e) == 1) {
             Expr aRe, aIm;
             if (!splitComplexI(c, c.child(e, 0), aRe, aIm))
                 return false;
@@ -316,6 +316,7 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
     // 2. Dirac impulse: g(u) * dirac(a*u + b) -> (1/|a|) * g(-b/a) * exp(sigma*i*v*(-b/a)).
     for (keel::usize i = 0; i < varFacs.size(); ++i) {
         if (c.kind(varFacs[i]) == NodeKind::Func &&
+            c.childCount(varFacs[i]) == 1 &&
             c.funcName(varFacs[i]) == "dirac") {
             Expr aLin, bLin;
             if (matchLinearInVar(c, c.child(varFacs[i], 0), u, aLin, bLin)) {
@@ -362,7 +363,8 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
             } else if (c.kind(f) == NodeKind::Pow && c.child(f, 0) == u &&
                        c.child(f, 1) == c.number(-2)) {
                 uInv2Idx = i;
-            } else if (c.kind(f) == NodeKind::Func && c.funcName(f) == "sin") {
+            } else if (c.kind(f) == NodeKind::Func && c.childCount(f) == 1 &&
+                       c.funcName(f) == "sin") {
                 sinIdx = i;
             } else if (c.kind(f) == NodeKind::Add && c.childCount(f) == 2) {
                 oneMinusCosIdx = i;
@@ -387,6 +389,7 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
                 varFacs[keel::as<keel::usize>(oneMinusCosIdx)];
             const Expr diffFromOne = c.simplify(c.add({c.one(), c.neg(addNode)}));
             if (c.kind(diffFromOne) == NodeKind::Func &&
+                c.childCount(diffFromOne) == 1 &&
                 c.funcName(diffFromOne) == "cos") {
                 Expr aLin, bLin;
                 if (matchLinearInVar(c, c.child(diffFromOne, 0), u, aLin,
@@ -408,7 +411,7 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
         }
     }
     if (varFacs.size() == 1 && c.kind(core) == NodeKind::Func &&
-        c.funcName(core) == "heaviside") {
+        c.childCount(core) == 1 && c.funcName(core) == "heaviside") {
         // heaviside(a - abs(u))
         const Expr hArg = c.child(core, 0);
         const Expr aConst = c.simplify(c.add({hArg, c.func("abs", u)}));
@@ -425,7 +428,7 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
     //    int sign(u + a) * exp(sigma*i*v*u) du = exp(-sigma*i*a*v) * (2*sigma*i / v)
     //      = (2 * sin(a*v) / v) + I * (2 * sigma * cos(a*v) / v).
     if (varFacs.size() == 1 && c.kind(core) == NodeKind::Func &&
-        c.funcName(core) == "sign") {
+        c.childCount(core) == 1 && c.funcName(core) == "sign") {
         Expr aLin, bLin;
         if (matchLinearInVar(c, c.child(core, 0), u, aLin, bLin) &&
             aLin == c.one()) {
@@ -453,6 +456,7 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
     // 5. Trigonometric modulation: g(u) * cos(w0*u) or g(u) * sin(w0*u).
     for (keel::usize i = 0; i < varFacs.size(); ++i) {
         if (c.kind(varFacs[i]) == NodeKind::Func &&
+            c.childCount(varFacs[i]) == 1 &&
             (c.funcName(varFacs[i]) == "cos" ||
              c.funcName(varFacs[i]) == "sin")) {
             const bool isCos = (c.funcName(varFacs[i]) == "cos");
@@ -513,7 +517,7 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
                     return false;
                 }
             }
-            if (c.kind(inner) != NodeKind::Func)
+            if (c.kind(inner) != NodeKind::Func || c.childCount(inner) != 1)
                 return false;
             const keel::String &fn = c.funcName(inner);
             Expr b0;
@@ -612,6 +616,8 @@ bool fourierRealTerm(Ctx &c, Expr term, Expr u, Expr v, keel::i32 expSign,
                 for (keel::i64 k = 0; k < uPow; ++k) {
                     const Expr dr = c.diff(rG, v);
                     const Expr dm = c.diff(mG, v);
+                    if (dr.isNull() || dm.isNull())
+                        return false;
                     rG = c.simplify(c.mul({c.number(expSign), dm}));
                     mG = c.simplify(c.mul({c.number(-expSign), dr}));
                 }
@@ -924,18 +930,25 @@ Expr normalizeBoxcarForCert(Ctx &c, Expr e, Expr w)
     case NodeKind::RootOf:
         return e;
     case NodeKind::Func: {
-        const Expr arg = normalizeBoxcarForCert(c, c.child(e, 0), w);
-        if (c.funcName(e) == "heaviside") {
-            const Expr aConst = c.simplify(c.add({arg, c.func("abs", w)}));
-            if (!dependsOn(c, aConst, w) && c.isAssumedPositive(aConst)) {
-                return c.mul(
-                    {c.number(Rational(1, BigInt(2))),
-                     c.add({c.func("sign", c.add({w, aConst})),
-                            c.neg(c.func("sign",
-                                         c.add({w, c.neg(aConst)})))})});
+        if (c.childCount(e) == 1) {
+            const Expr arg = normalizeBoxcarForCert(c, c.child(e, 0), w);
+            if (c.funcName(e) == "heaviside") {
+                const Expr aConst = c.simplify(c.add({arg, c.func("abs", w)}));
+                if (!dependsOn(c, aConst, w) && c.isAssumedPositive(aConst)) {
+                    return c.mul(
+                        {c.number(Rational(1, BigInt(2))),
+                         c.add({c.func("sign", c.add({w, aConst})),
+                                c.neg(c.func("sign",
+                                             c.add({w, c.neg(aConst)})))})});
+                }
             }
+            return c.func(c.funcName(e), arg);
         }
-        return c.func(c.funcName(e), arg);
+        keel::Array<Expr> args;
+        args.reserve(c.childCount(e));
+        for (keel::usize i = 0; i < c.childCount(e); ++i)
+            args.push_back(normalizeBoxcarForCert(c, c.child(e, i), w));
+        return c.func(c.funcName(e), args);
     }
     case NodeKind::Pow:
         return c.pow(normalizeBoxcarForCert(c, c.child(e, 0), w),

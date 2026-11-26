@@ -6,11 +6,6 @@ namespace keel::cas {
 
 namespace {
 
-const Rational R0()
-{
-    return Rational(keel::i64{0});
-}
-
 const Rational R1()
 {
     return Rational(keel::i64{1});

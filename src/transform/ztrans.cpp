@@ -120,44 +120,6 @@ bool matchLinearInVar(Ctx &c, Expr arg, Expr var, Expr &c0Out, Expr &c1Out)
     return false;
 }
 
-Expr rewriteHypToExpZ(Ctx &c, Expr e, Expr var)
-{
-    if (e.isNull() || !mentionsSymbol(c, e, var))
-        return e;
-    switch (c.kind(e)) {
-    case NodeKind::Number:
-    case NodeKind::Symbol:
-    case NodeKind::RootOf:
-        return e;
-    case NodeKind::Func: {
-        const keel::String &fn = c.funcName(e);
-        const Expr u = rewriteHypToExpZ(c, c.child(e, 0), var);
-        const Expr half = c.number(Rational(keel::i64{1}, BigInt(2)));
-        if (fn == "sinh") {
-            return c.mul(
-                {half, c.add({c.func("exp", u), c.neg(c.func("exp", c.neg(u)))})});
-        }
-        if (fn == "cosh") {
-            return c.mul(
-                {half, c.add({c.func("exp", u), c.func("exp", c.neg(u))})});
-        }
-        return c.func(fn, u);
-    }
-    case NodeKind::Pow:
-        return c.pow(rewriteHypToExpZ(c, c.child(e, 0), var),
-                     rewriteHypToExpZ(c, c.child(e, 1), var));
-    case NodeKind::Add:
-    case NodeKind::Mul: {
-        keel::Array<Expr> kids;
-        kids.reserve(c.childCount(e));
-        for (keel::usize i = 0; i < c.childCount(e); ++i)
-            kids.push_back(rewriteHypToExpZ(c, c.child(e, i), var));
-        return c.kind(e) == NodeKind::Add ? c.add(kids) : c.mul(kids);
-    }
-    }
-    return e;
-}
-
 Expr reduceTrigProductsOnceZ(Ctx &c, Expr e, Expr var, bool &changed)
 {
     if (e.isNull() || !mentionsSymbol(c, e, var))
@@ -165,6 +127,7 @@ Expr reduceTrigProductsOnceZ(Ctx &c, Expr e, Expr var, bool &changed)
     const Expr half = c.number(Rational(keel::i64{1}, BigInt(2)));
 
     if (c.kind(e) == NodeKind::Pow && c.kind(c.child(e, 0)) == NodeKind::Func &&
+        c.childCount(c.child(e, 0)) == 1 &&
         c.kind(c.child(e, 1)) == NodeKind::Number) {
         const keel::String &fn = c.funcName(c.child(e, 0));
         const Expr u = c.child(c.child(e, 0), 0);
@@ -200,7 +163,7 @@ Expr reduceTrigProductsOnceZ(Ctx &c, Expr e, Expr var, bool &changed)
             kids.push_back(
                 reduceTrigProductsOnceZ(c, c.child(e, i), var, changed));
         for (keel::usize i = 0; i < kids.size(); ++i) {
-            if (c.kind(kids[i]) != NodeKind::Func)
+            if (c.kind(kids[i]) != NodeKind::Func || c.childCount(kids[i]) != 1)
                 continue;
             const keel::String &f1 = c.funcName(kids[i]);
             if (f1 != "sin" && f1 != "cos")
@@ -209,7 +172,7 @@ Expr reduceTrigProductsOnceZ(Ctx &c, Expr e, Expr var, bool &changed)
             if (!mentionsSymbol(c, u, var))
                 continue;
             for (keel::usize j = i + 1; j < kids.size(); ++j) {
-                if (c.kind(kids[j]) != NodeKind::Func)
+                if (c.kind(kids[j]) != NodeKind::Func || c.childCount(kids[j]) != 1)
                     continue;
                 const keel::String &f2 = c.funcName(kids[j]);
                 if (f2 != "sin" && f2 != "cos")
@@ -251,8 +214,12 @@ Expr reduceTrigProductsOnceZ(Ctx &c, Expr e, Expr var, bool &changed)
         return c.add(kids);
     }
     if (c.kind(e) == NodeKind::Func) {
-        return c.func(c.funcName(e),
-                      reduceTrigProductsOnceZ(c, c.child(e, 0), var, changed));
+        keel::Array<Expr> args;
+        args.reserve(c.childCount(e));
+        for (keel::usize i = 0; i < c.childCount(e); ++i)
+            args.push_back(
+                reduceTrigProductsOnceZ(c, c.child(e, i), var, changed));
+        return c.func(c.funcName(e), args);
     }
     return e;
 }
@@ -284,16 +251,19 @@ Expr evalDiscreteAtInt(Ctx &c, Expr e, Expr n, keel::i64 k)
         case NodeKind::RootOf:
             return node;
         case NodeKind::Func: {
-            const Expr arg = self(self, c.child(node, 0));
-            if (isDeltaFuncName(c.funcName(node))) {
-                const Expr sArg = c.simplify(arg);
+            keel::Array<Expr> args;
+            args.reserve(c.childCount(node));
+            for (keel::usize i = 0; i < c.childCount(node); ++i)
+                args.push_back(self(self, c.child(node, i)));
+            if (args.size() == 1 && isDeltaFuncName(c.funcName(node))) {
+                const Expr sArg = c.simplify(args[0]);
                 if (c.isZero(sArg))
                     return c.one();
                 Rational r;
                 if (c.evalExact(sArg, {}, r) && !r.isZero())
                     return c.zero();
             }
-            return c.func(c.funcName(node), arg);
+            return c.func(c.funcName(node), args);
         }
         case NodeKind::Pow: {
             const Expr b = self(self, c.child(node, 0));
@@ -384,7 +354,7 @@ ZTransResult ztransTerm(Ctx &c, Expr term, Expr n, Expr z, Budget *budget)
                 continue;
             }
         }
-        if (c.kind(fac) == NodeKind::Func) {
+        if (c.kind(fac) == NodeKind::Func && c.childCount(fac) == 1) {
             const keel::String &fn = c.funcName(fac);
             const Expr arg = c.child(fac, 0);
             Expr c0, c1;
@@ -406,7 +376,7 @@ ZTransResult ztransTerm(Ctx &c, Expr term, Expr n, Expr z, Budget *budget)
                 continue;
             }
             if (!hasDelta && isDeltaFuncName(fn) &&
-                matchLinearInVar(c, arg, n, c0, c1)) {
+                matchLinearInVar(c, arg, n, c0, c1) && !c.isZero(c1)) {
                 // Match n - k == 0 or k - n == 0 -> k = -c0 / c1.
                 const Expr kExpr = c.simplify(c.neg(c.div(c0, c1)));
                 Rational kRat;
@@ -832,6 +802,8 @@ bool iztransFromRationalQ(Ctx &c, Expr F, Expr z, Expr n, Budget *budget,
 bool iztransParametric(Ctx &c, Expr F, Expr z, Expr n, Expr &out)
 {
     const Expr fOverZ = simplifyRationalExpr(c, c.div(F, z));
+    if (fOverZ.isNull())
+        return false;
     keel::Array<Expr> factors;
     if (c.kind(fOverZ) == NodeKind::Mul) {
         for (keel::usize i = 0; i < c.childCount(fOverZ); ++i)
@@ -901,6 +873,10 @@ ZTransResult iztrans(Ctx &c, Expr F, Expr z, Expr n, Budget *budget)
         return out;
 
     const Expr fNorm = simplifyRationalExpr(c, F);
+    if (fNorm.isNull()) {
+        out.reason.assign("invalid rational expression");
+        return out;
+    }
     Expr cand;
     bool ok = iztransFromRationalQ(c, fNorm, z, n, budget, cand);
     if (!ok && (!budget || budget->ok()))
@@ -968,24 +944,31 @@ Expr expandSequenceShifts(Ctx &c, Expr e, Expr n)
     }
     case NodeKind::Func: {
         const keel::String &fn = c.funcName(e);
-        const Expr arg = expandSequenceShifts(c, c.child(e, 0), n);
-        Expr c0, c1;
-        if ((fn == "sin" || fn == "cos") &&
-            matchLinearInVar(c, arg, n, c0, c1) && !c.isZero(c1) &&
-            !c.isZero(c0)) {
-            const Expr wn = c.mul({c1, n});
-            const Expr cosC0 = c.simplify(c.func("cos", c0));
-            const Expr sinC0 = c.simplify(c.func("sin", c0));
-            if (fn == "sin") {
-                return c.add({c.mul({cosC0, c.func("sin", wn)}),
-                              c.mul({sinC0, c.func("cos", wn)})});
+        if (c.childCount(e) == 1) {
+            const Expr arg = expandSequenceShifts(c, c.child(e, 0), n);
+            Expr c0, c1;
+            if ((fn == "sin" || fn == "cos") &&
+                matchLinearInVar(c, arg, n, c0, c1) && !c.isZero(c1) &&
+                !c.isZero(c0)) {
+                const Expr wn = c.mul({c1, n});
+                const Expr cosC0 = c.simplify(c.func("cos", c0));
+                const Expr sinC0 = c.simplify(c.func("sin", c0));
+                if (fn == "sin") {
+                    return c.add({c.mul({cosC0, c.func("sin", wn)}),
+                                  c.mul({sinC0, c.func("cos", wn)})});
+                }
+                return c.add({c.mul({cosC0, c.func("cos", wn)}),
+                              c.neg(c.mul({sinC0, c.func("sin", wn)}))});
             }
-            return c.add({c.mul({cosC0, c.func("cos", wn)}),
-                          c.neg(c.mul({sinC0, c.func("sin", wn)}))});
+            if (isDeltaFuncName(fn))
+                return c.zero(); // for asymptotic recurrence check n >= K
+            return c.func(fn, arg);
         }
-        if (isDeltaFuncName(fn))
-            return c.zero(); // for asymptotic recurrence check n >= K
-        return c.func(fn, arg);
+        keel::Array<Expr> args;
+        args.reserve(c.childCount(e));
+        for (keel::usize i = 0; i < c.childCount(e); ++i)
+            args.push_back(expandSequenceShifts(c, c.child(e, i), n));
+        return c.func(fn, args);
     }
     case NodeKind::Add:
     case NodeKind::Mul: {

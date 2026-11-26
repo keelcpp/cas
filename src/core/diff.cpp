@@ -129,6 +129,8 @@ Expr Ctx::diffRec(Expr e, Expr var, keel::HashMap<keel::u32, Expr> &memo)
                 result = func("diff", {child(e, 0), var, number(keel::i64{2})});
             } else {
                 const Expr df = diffRec(child(e, 0), var, memo);
+                if (df.isNull())
+                    break;
                 result = isZero(df) ? zero() : func("diff", {e, var});
             }
             break;
@@ -138,6 +140,8 @@ Expr Ctx::diffRec(Expr e, Expr var, keel::HashMap<keel::u32, Expr> &memo)
                 result = func("diff", {child(e, 0), var, add({child(e, 2), one()})});
             } else {
                 const Expr df = diffRec(child(e, 0), var, memo);
+                if (df.isNull())
+                    break;
                 result = isZero(df) ? zero() : func("diff", {e, var});
             }
             break;
@@ -156,7 +160,7 @@ Expr Ctx::diffRec(Expr e, Expr var, keel::HashMap<keel::u32, Expr> &memo)
             if (isZero(da) && isZero(db) && isZero(dc)) {
                 if (isZero(du) || isZero(a) || isZero(b)) {
                     result = zero();
-                } else {
+                } else if (!isZero(cParam)) {
                     const Expr a1 = add({a, one()});
                     const Expr b1 = add({b, one()});
                     const Expr c1 = add({cParam, one()});
@@ -179,7 +183,7 @@ Expr Ctx::diffRec(Expr e, Expr var, keel::HashMap<keel::u32, Expr> &memo)
             if (isZero(da) && isZero(db)) {
                 if (isZero(du) || isZero(a)) {
                     result = zero();
-                } else {
+                } else if (!isZero(b)) {
                     const Expr a1 = add({a, one()});
                     const Expr b1 = add({b, one()});
                     result = mul({
@@ -409,6 +413,10 @@ Expr Ctx::diffRec(Expr e, Expr var, keel::HashMap<keel::u32, Expr> &memo)
             } else {
                 result = Expr();
             }
+            break;
+        }
+        if (childCount(e) != 1) {
+            result = Expr();
             break;
         }
         const Expr u = child(e, 0);

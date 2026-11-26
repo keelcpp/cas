@@ -498,7 +498,6 @@ bool integrateSquarefree(Ctx &c, Expr var, const UPoly &A, const UPoly &F,
                     }
                 }
                 const UPoly Aq(keel::move(aCs)), Bq(keel::move(bCs));
-                if (v.deg() >= 1)
                 if (v.deg() < 1 || Bq.isZero())
                     continue;
                 const UPoly dA = Aq.derivative(), dB = Bq.derivative();

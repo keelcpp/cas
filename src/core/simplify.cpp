@@ -980,10 +980,12 @@ Expr simplifyMulNode(Ctx &c, Expr e)
     keel::Array<Expr> expArgs;
     for (keel::usize i = 0; i < c.childCount(e); ++i) {
         const Expr ch = c.child(e, i);
-        if (c.kind(ch) == NodeKind::Func && c.funcName(ch) == "exp") {
+        if (c.kind(ch) == NodeKind::Func && c.childCount(ch) == 1 &&
+            c.funcName(ch) == "exp") {
             expArgs.push_back(c.child(ch, 0));
         } else if (c.kind(ch) == NodeKind::Pow &&
                    c.kind(c.child(ch, 0)) == NodeKind::Func &&
+                   c.childCount(c.child(ch, 0)) == 1 &&
                    c.funcName(c.child(ch, 0)) == "exp") {
             expArgs.push_back(
                 c.mul({c.child(ch, 1), c.child(c.child(ch, 0), 0)}));
@@ -1021,11 +1023,13 @@ Expr simplifyMulNode(Ctx &c, Expr e)
         if (numIdx < factors.size()) {
             for (keel::usize i = 0; i < factors.size() && !mergedDoubleSin; ++i) {
                 if (c.kind(factors[i]) != NodeKind::Func ||
+                    c.childCount(factors[i]) != 1 ||
                     c.funcName(factors[i]) != "sin")
                     continue;
                 const Expr u = c.child(factors[i], 0);
                 for (keel::usize j = 0; j < factors.size() && !mergedDoubleSin; ++j) {
                     if (i == j || c.kind(factors[j]) != NodeKind::Func ||
+                        c.childCount(factors[j]) != 1 ||
                         c.funcName(factors[j]) != "cos" ||
                         !(c.child(factors[j], 0) == u))
                         continue;
@@ -1043,7 +1047,7 @@ Expr simplifyMulNode(Ctx &c, Expr e)
     // Fold sin(u)^k * cos(u)^(-k) -> tan(u)^k and sinh(u)^k * cosh(u)^(-k) -> tanh(u)^k.
     auto extractTrigPow = [&](Expr f, keel::StringRef &fnOut, Expr &argOut,
                               Rational &expOut) -> bool {
-        if (c.kind(f) == NodeKind::Func) {
+        if (c.kind(f) == NodeKind::Func && c.childCount(f) == 1) {
             fnOut = c.funcName(f);
             argOut = c.child(f, 0);
             expOut = Rational(keel::i64{1});
@@ -1051,6 +1055,7 @@ Expr simplifyMulNode(Ctx &c, Expr e)
         }
         if (c.kind(f) == NodeKind::Pow &&
             c.kind(c.child(f, 0)) == NodeKind::Func &&
+            c.childCount(c.child(f, 0)) == 1 &&
             c.kind(c.child(f, 1)) == NodeKind::Number) {
             fnOut = c.funcName(c.child(f, 0));
             argOut = c.child(c.child(f, 0), 0);
@@ -1127,12 +1132,17 @@ Expr simplifyMulNode(Ctx &c, Expr e)
                         c.numberValue(diffArgs).num().fitsInt64(m) &&
                         keel::abs(m) <= 12) {
                         keel::Array<Expr> pochFactors;
+                        bool okGamma = true;
                         if (m > 0) {
                             for (keel::i64 k = 0; k < m; ++k) {
                                 const Expr step =
                                     k == 0 ? denArg
                                            : simplifyRationalExpr(
                                                  c, c.add({denArg, c.number(k)}));
+                                if (step.isNull()) {
+                                    okGamma = false;
+                                    break;
+                                }
                                 pochFactors.push_back(step);
                             }
                         } else if (m < 0) {
@@ -1141,10 +1151,16 @@ Expr simplifyMulNode(Ctx &c, Expr e)
                                     k == 0 ? numArg
                                            : simplifyRationalExpr(
                                                  c, c.add({numArg, c.number(k)}));
+                                if (step.isNull() || c.isZero(step)) {
+                                    okGamma = false;
+                                    break;
+                                }
                                 pochFactors.push_back(
                                     c.pow(step, c.number(keel::i64{-1})));
                             }
                         }
+                        if (!okGamma)
+                            continue;
                         factors[i] = pochFactors.empty() ? c.one()
                                                          : c.mul(pochFactors);
                         factors.remove_at(j);
@@ -1198,21 +1214,34 @@ Expr simplifyMulNode(Ctx &c, Expr e)
                         reflFactors.push_back(
                             c.pow(sinVal, c.number(keel::i64{-1})));
                         const keel::i64 shiftM = m - 1;
+                        bool okRefl = true;
                         if (shiftM > 0) {
                             for (keel::i64 k = 0; k < shiftM; ++k) {
                                 const Expr step = simplifyRationalExpr(
                                     c, c.add({oneMinusU, c.number(k)}));
+                                if (step.isNull()) {
+                                    okRefl = false;
+                                    break;
+                                }
                                 reflFactors.push_back(step);
                             }
                         } else if (shiftM < 0) {
                             for (keel::i64 k = 0; k < -shiftM; ++k) {
                                 const Expr step = simplifyRationalExpr(
                                     c, c.add({vOther, c.number(k)}));
+                                if (step.isNull() || c.isZero(step)) {
+                                    okRefl = false;
+                                    break;
+                                }
                                 reflFactors.push_back(
                                     c.pow(step, c.number(keel::i64{-1})));
                             }
                         }
+                        if (!okRefl)
+                            continue;
                         const Expr prodRefl = c.mul(reflFactors);
+                        if (!isPosUnitI && c.isZero(prodRefl))
+                            continue;
                         factors[i] = isPosUnitI
                                          ? prodRefl
                                          : c.pow(prodRefl,
@@ -1232,11 +1261,13 @@ Expr simplifyMulNode(Ctx &c, Expr e)
         mergedAbsSign = false;
         for (keel::usize i = 0; i < factors.size() && !mergedAbsSign; ++i) {
             if (c.kind(factors[i]) != NodeKind::Func ||
+                c.childCount(factors[i]) != 1 ||
                 c.funcName(factors[i]) != "abs")
                 continue;
             const Expr u = c.child(factors[i], 0);
             for (keel::usize j = 0; j < factors.size() && !mergedAbsSign; ++j) {
                 if (i == j || c.kind(factors[j]) != NodeKind::Func ||
+                    c.childCount(factors[j]) != 1 ||
                     c.funcName(factors[j]) != "sign")
                     continue;
                 const Expr v = c.child(factors[j], 0);
@@ -1823,6 +1854,9 @@ Expr simplifyFuncNode(Ctx &c, Expr e)
         return e;
     }
 
+    if (c.childCount(e) != 1)
+        return e;
+
     const Expr arg = c.child(e, 0);
 
     if (fn == "zeta" && c.kind(arg) == NodeKind::Number) {
@@ -2276,7 +2310,7 @@ Expr simplifyFuncNode(Ctx &c, Expr e)
     }
 
     // Inverse function compositions
-    if (c.kind(arg) == NodeKind::Func) {
+    if (c.kind(arg) == NodeKind::Func && c.childCount(arg) == 1) {
         const keel::String &innerFn = c.funcName(arg);
         const Expr u = c.child(arg, 0);
         if ((fn == "exp" && innerFn == "log") ||
@@ -2588,6 +2622,8 @@ void collectTrigArgs(const Ctx &c, Expr e, keel::Array<Expr> &args)
         if (fn == "sin" || fn == "cos" || fn == "tan" || fn == "cot" ||
             fn == "sec" || fn == "csc" || fn == "sinh" || fn == "cosh" ||
             fn == "tanh" || fn == "coth" || fn == "sech" || fn == "csch") {
+            if (c.childCount(e) != 1)
+                return;
             const Expr arg = c.child(e, 0);
             if (keel::find(args.begin(), args.end(), arg) == args.end())
                 args.push_back(arg);

@@ -504,7 +504,6 @@ Expr simplifyRationalExpr(Ctx &c, Expr e)
         if (primNum == primDen) {
             return smRatio;
         }
-        Expr newNum, newDen;
         FormalFrac smFrac = toFormalFrac(c, smRatio);
         if (!smFrac.num.isNull() && !smFrac.den.isNull()) {
             f.num = c.expand(c.mul({smFrac.num, primNum}));

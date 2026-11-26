@@ -2206,7 +2206,6 @@ OdeResult dsolve2Nonlinear(Ctx &c, Expr rhs, Expr x, Expr y, Expr dy,
         return out;
     }
 
-    const Expr C1 = c.symbol("C1");
     const Expr C2 = c.symbol("C2");
 
     // Case 1: Dependent variable y missing (`y'' = F(x, y')`).
